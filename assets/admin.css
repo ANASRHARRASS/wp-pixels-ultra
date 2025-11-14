@@ -1,0 +1,8 @@
+.wrap .form-table textarea#event_mapping {
+  font-family: monospace;
+  font-size: 13px;
+  line-height: 1.4;
+  min-height: 220px;
+  width: 100%;
+}
+.wrap .description code { display: block; white-space: pre; background:#f8f8f8; padding:8px; border-radius:3px; }

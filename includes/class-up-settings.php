@@ -1,0 +1,278 @@
+<?php
+if ( ! defined( 'ABSPATH' ) ) { exit; }
+
+class UP_Settings {
+    // Replace previous simple register with structured settings, sanitization and defaults
+    public static function init() {
+        register_setting(
+            'up_settings_group',
+            'up_settings',
+            array( __CLASS__, 'sanitize_callback' )
+        );
+    }
+
+    public static function defaults() {
+        $default_mappings = array(
+            'purchase' => array(
+                'meta' => array( 'event_name' => 'Purchase', 'include_user_data' => true ),
+                'tiktok' => array( 'event_name' => 'PlaceAnOrder', 'include_user_data' => true ),
+            ),
+            'add_to_cart' => array(
+                'meta' => array( 'event_name' => 'AddToCart', 'include_user_data' => false ),
+                'tiktok' => array( 'event_name' => 'AddToCart', 'include_user_data' => false ),
+            ),
+            'view_item' => array(
+                'meta' => array( 'event_name' => 'ViewContent', 'include_user_data' => false ),
+                'tiktok' => array( 'event_name' => 'ViewContent', 'include_user_data' => false ),
+            ),
+            'view_item_list' => array(
+                'meta' => array( 'event_name' => 'ViewCategory', 'include_user_data' => false ),
+                'tiktok' => array( 'event_name' => 'BrowseCategory', 'include_user_data' => false ),
+            ),
+            'begin_checkout' => array(
+                'meta' => array( 'event_name' => 'InitiateCheckout', 'include_user_data' => false ),
+                'tiktok' => array( 'event_name' => 'InitiateCheckout', 'include_user_data' => false ),
+            ),
+            'whatsapp_initiate' => array(
+                'meta' => array( 'event_name' => 'Contact', 'include_user_data' => true ),
+                'tiktok' => array( 'event_name' => 'Contact', 'include_user_data' => true ),
+            ),
+            'whatsapp_click' => array(
+                'meta' => array( 'event_name' => 'Lead', 'include_user_data' => true ),
+                'tiktok' => array( 'event_name' => 'Lead', 'include_user_data' => true ),
+            ),
+        );
+        return array(
+            'gtm_container_id'  => '',
+            'meta_pixel_id'     => '',
+            'tiktok_pixel_id'   => '',
+            'enable_gtm'        => 'no',
+            'enable_meta'       => 'no',
+            'enable_tiktok'     => 'no',
+            'server_secret'     => '',
+            'capi_endpoint'     => '',
+            'capi_token'        => '',
+            'event_mapping'     => wp_json_encode( $default_mappings ),
+        );
+    }
+
+    public static function sanitize_callback( $input ) {
+        $defaults = self::defaults();
+        $out = $defaults;
+        if ( ! is_array( $input ) ) {
+            return $out;
+        }
+        // whitelist and sanitize known keys
+        foreach ( $defaults as $key => $default ) {
+            if ( isset( $input[ $key ] ) ) {
+                $val = $input[ $key ];
+                switch ( $key ) {
+                    case 'enable_gtm':
+                    case 'enable_meta':
+                    case 'enable_tiktok':
+                        $out[ $key ] = ( $val === 'yes' ) ? 'yes' : 'no';
+                        break;
+                    case 'capi_token':
+                        // token-like values: sanitize_text_field then trim
+                        $out[ $key ] = sanitize_text_field( trim( $val ) );
+                        break;
+                    case 'capi_endpoint':
+                        $out[ $key ] = esc_url_raw( trim( $val ) );
+                        break;
+                    default:
+                        $out[ $key ] = sanitize_text_field( $val );
+                        break;
+                }
+            }
+        }
+
+        $raw_map = isset( $input['event_mapping'] ) ? trim( $input['event_mapping'] ) : '';
+        if ( $raw_map === '' ) {
+            $out['event_mapping'] = '{}';
+        } else {
+            $decoded = json_decode( $raw_map, true );
+            if ( json_last_error() === JSON_ERROR_NONE && is_array( $decoded ) ) {
+                $out['event_mapping'] = wp_json_encode( $decoded );
+            } else {
+                set_transient( 'up_event_map_error', 'Invalid JSON for event mapping. Changes not saved.', 30 );
+            }
+        }
+
+        return $out;
+    }
+
+    public static function get( $key, $default = '' ) {
+        $opts = get_option( 'up_settings', array() );
+        $defaults = self::defaults();
+        $opts = wp_parse_args( $opts, $defaults );
+        return isset( $opts[ $key ] ) ? $opts[ $key ] : $default;
+    }
+
+    public static function update( $key, $value ) {
+        $opts = get_option( 'up_settings', array() );
+        if ( ! is_array( $opts ) ) $opts = array();
+        $opts[ $key ] = $value;
+        update_option( 'up_settings', $opts );
+    }
+
+    // Backwards compatible page renderer. Admin class will call this.
+    public static function render_page() {
+        if ( ! current_user_can( 'manage_options' ) ) return;
+        $opts = get_option( 'up_settings', array() );
+        $opts = wp_parse_args( $opts, self::defaults() );
+
+        // Use the WP Settings API form action target and nonce is handled by settings_fields()
+        ?>
+        <div class="wrap">
+            <h1><?php echo esc_html__( 'Ultra Pixels Settings', 'ultra-pixels-ultra' ); ?></h1>
+            <form method="post" action="options.php">
+                <?php settings_fields( 'up_settings_group' ); ?>
+                <table class="form-table">
+                    <tr>
+                        <th scope="row"><label for="gtm_container_id">GTM Container ID</label></th>
+                        <td><input name="up_settings[gtm_container_id]" id="gtm_container_id" type="text" value="<?php echo esc_attr( $opts['gtm_container_id'] ); ?>" class="regular-text" /></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="enable_gtm">Enable GTM</label></th>
+                        <td>
+                            <select name="up_settings[enable_gtm]" id="enable_gtm">
+                                <option value="no" <?php selected( $opts['enable_gtm'], 'no' ); ?>>No</option>
+                                <option value="yes" <?php selected( $opts['enable_gtm'], 'yes' ); ?>>Yes</option>
+                            </select>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="meta_pixel_id">Meta Pixel ID</label></th>
+                        <td><input name="up_settings[meta_pixel_id]" id="meta_pixel_id" type="text" value="<?php echo esc_attr( $opts['meta_pixel_id'] ); ?>" class="regular-text" /></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="enable_meta">Enable Meta</label></th>
+                        <td>
+                            <select name="up_settings[enable_meta]" id="enable_meta">
+                                <option value="no" <?php selected( $opts['enable_meta'], 'no' ); ?>>No</option>
+                                <option value="yes" <?php selected( $opts['enable_meta'], 'yes' ); ?>>Yes</option>
+                            </select>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="tiktok_pixel_id">TikTok Pixel ID</label></th>
+                        <td><input name="up_settings[tiktok_pixel_id]" id="tiktok_pixel_id" type="text" value="<?php echo esc_attr( $opts['tiktok_pixel_id'] ); ?>" class="regular-text" /></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="enable_tiktok">Enable TikTok</label></th>
+                        <td>
+                            <select name="up_settings[enable_tiktok]" id="enable_tiktok">
+                                <option value="no" <?php selected( $opts['enable_tiktok'], 'no' ); ?>>No</option>
+                                <option value="yes" <?php selected( $opts['enable_tiktok'], 'yes' ); ?>>Yes</option>
+                            </select>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="capi_endpoint">CAPI Endpoint</label></th>
+                        <td><input name="up_settings[capi_endpoint]" id="capi_endpoint" type="text" value="<?php echo esc_attr( $opts['capi_endpoint'] ); ?>" class="regular-text" /></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="capi_token">CAPI Token</label></th>
+                        <td><input name="up_settings[capi_token]" id="capi_token" type="text" value="<?php echo esc_attr( $opts['capi_token'] ); ?>" class="regular-text" /></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="server_secret">Server Secret</label></th>
+                        <td><input name="up_settings[server_secret]" id="server_secret" type="password" value="<?php echo esc_attr( $opts['server_secret'] ); ?>" class="regular-text" />
+                        <p class="description">Optional secret for server-to-server ingest (if used, prefer defining <code>UP_SERVER_SECRET</code> in <code>wp-config.php</code>).</p>
+                        </td>
+                    </tr>
+                </table>
+                <?php submit_button(); ?>
+
+                <h2>CAPI Queue</h2>
+                <div id="up-capi-queue">
+                    <p>Queue length: <strong id="up-queue-length"><?php echo intval( class_exists('UP_CAPI') ? UP_CAPI::get_queue_length() : 0 ); ?></strong></p>
+                    <p>Last processed: <strong id="up-last-processed"><?php $lp = get_option('up_capi_last_processed', 0); echo $lp ? date('c', $lp) : 'never'; ?></strong></p>
+                    <p>
+                        <button id="up-process-queue" class="button button-primary">Process now</button>
+                        <span id="up-process-result" style="margin-left:12px;"></span>
+                    </p>
+
+                    <h3>Queue Items</h3>
+                    <p>
+                        <label for="up-queue-limit">Items per page: </label>
+                        <select id="up-queue-limit">
+                            <option value="10">10</option>
+                            <option value="20" selected>20</option>
+                            <option value="50">50</option>
+                        </select>
+                        <button id="up-queue-refresh" class="button">Refresh</button>
+                    </p>
+                    <div id="up-queue-items"></div>
+                </div>
+
+                <h2>Event Mapping</h2>
+                <p>Configure how your events are named and sent to Meta and TikTok CAPI. The mapping uses a JSON format: each event key (e.g., "purchase") maps to platform configurations with event names and user data inclusion.</p>
+                
+                <table class="form-table">
+                    <tr>
+                        <th scope="row"><label for="event_mapping">Event Mapping (JSON)</label></th>
+                        <td>
+                            <textarea name="up_settings[event_mapping]" id="event_mapping" rows="15" class="large-text code" style="width:100%;"><?php echo esc_textarea( $opts['event_mapping'] ); ?></textarea>
+                            <p class="description">
+                                <strong>Common events:</strong> purchase, add_to_cart, view_item, view_item_list, begin_checkout, whatsapp_initiate, whatsapp_click<br/>
+                                <strong>Platforms:</strong> meta, tiktok<br/>
+                                <strong>Fields:</strong> event_name (string), include_user_data (boolean)<br/>
+                                Example: <code>{"purchase": {"meta": {"event_name": "Purchase", "include_user_data": true}}}</code>
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+
+                <div id="event-mapping-preview" style="background:#f5f5f5;padding:12px;border-radius:4px;margin:16px 0;">
+                    <h3>Current Mappings Preview</h3>
+                    <div id="mapping-preview-content" style="font-size:12px;white-space:pre-wrap;font-family:monospace;max-height:300px;overflow:auto;">
+                        Loading...
+                    </div>
+                </div>
+
+            </form>
+            <h2>Landing Page Integration</h2>
+            <p>Track WhatsApp interactions and custom events on landing pages by adding data attributes to your HTML elements:</p>
+            <h3>WhatsApp Button Example</h3>
+            <pre style="background:#f5f5f5;padding:12px;border-radius:4px;overflow:auto;"><code>&lt;!-- Simple WhatsApp link --&gt;
+&lt;a href="https://wa.me/15551234567?text=Hello%20I%20need%20help" class="button"&gt;Contact us on WhatsApp&lt;/a&gt;
+
+&lt;!-- With custom event attributes --&gt;
+&lt;a href="https://wa.me/15551234567" data-up-event="whatsapp_initiate" data-up-payload='{"button_location":"hero"}'&gt;WhatsApp Help&lt;/a&gt;
+
+&lt;!-- Generic custom event --&gt;
+&lt;button data-up-event="video_play" data-up-payload='{"video_id":"promo_1", "duration":60}'&gt;Play Video&lt;/button&gt;</code></pre>
+
+            <h2>Notes</h2>
+            <p>Use GTM for advanced deployments. For server-side CAPI forwarding add a secure endpoint and token. This plugin provides a boilerplate — extend with your server-side forwarding logic and event mapping.</p>
+        </div>
+
+        <script>
+            (function(){
+                function updateMappingPreview() {
+                    var txt = document.getElementById('event_mapping');
+                    if (!txt) return;
+                    try {
+                        var mapping = JSON.parse(txt.value);
+                        var html = '<strong>Events:</strong> ' + Object.keys(mapping).join(', ') + '<br/>';
+                        Object.keys(mapping).forEach(function(evt){
+                            var cfg = mapping[evt];
+                            var platforms = Object.keys(cfg).join(', ');
+                            html += '  ' + evt + ' → ' + platforms + '<br/>';
+                        });
+                        document.getElementById('mapping-preview-content').innerHTML = html;
+                    } catch(e) {
+                        document.getElementById('mapping-preview-content').innerHTML = '<span style="color:red;">Invalid JSON: ' + e.message + '</span>';
+                    }
+                }
+                var ta = document.getElementById('event_mapping');
+                if (ta) {
+                    ta.addEventListener('input', updateMappingPreview);
+                    updateMappingPreview();
+                }
+            })();
+        </script>
+        <?php
+    }
+}
