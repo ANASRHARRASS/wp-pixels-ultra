@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: Ultra Pixels Ultra
- * Description: Production-ready GTM / Meta / TikTok / CAPI tracking & server-side forwarding with queue, dead-letter, rate-limiting, and adapters.
+ * Description: GTM-first tracking with Meta, TikTok, Google Ads, Snapchat, Pinterest. Features Enhanced Ecommerce, Elementor integration, auto form tracking, and enterprise CAPI queue.
  * Version: 0.3.0
  * Author: anas
  * Text Domain: ultra-pixels-ultra
@@ -36,6 +36,7 @@ $optional_includes = array(
     'class-up-front.php',
     'class-up-events.php',
     'class-up-capi.php',
+    'class-up-elementor.php',
 );
 foreach ( $optional_includes as $file ) {
     $path = UP_PLUGIN_DIR . 'includes/' . $file;
