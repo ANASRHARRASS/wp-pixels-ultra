@@ -65,7 +65,21 @@ class UP_Loader {
         // schedule/process CAPI queue via WP-Cron
         if ( class_exists( 'UP_CAPI' ) ) {
             add_action( 'up_capi_process_queue', array( 'UP_CAPI', 'process_queue' ) );
-            // ensure the hook is registered for future scheduling
+            // ensure a recurring schedule exists as a safety net
+            if ( ! wp_next_scheduled( 'up_capi_process_queue' ) ) {
+                wp_schedule_event( time() + 300, 'hourly', 'up_capi_process_queue' );
+            }
+        }
+
+        // WP-CLI command for manual processing: `wp up-capi process [--limit=50]`
+        if ( defined( 'WP_CLI' ) && WP_CLI && class_exists( 'WP_CLI' ) ) {
+            if ( class_exists( 'UP_CAPI' ) ) {
+                WP_CLI::add_command( 'up-capi', function( $args, $assoc_args ) {
+                    $limit = isset( $assoc_args['limit'] ) ? intval( $assoc_args['limit'] ) : 50;
+                    $processed = UP_CAPI::process_queue( $limit );
+                    WP_CLI::success( "Processed {$processed} items (limit={$limit})" );
+                } );
+            }
         }
     }
 }

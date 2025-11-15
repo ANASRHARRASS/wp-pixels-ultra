@@ -53,6 +53,10 @@ class UP_Settings {
             'capi_endpoint'     => '',
             'capi_token'        => '',
             'event_mapping'     => wp_json_encode( $default_mappings ),
+            // rate limit controls (requests per minute)
+            'rate_limit_ip_per_min'    => 60,
+            'rate_limit_token_per_min' => 600,
+            'retry_after_seconds'      => 60,
         );
     }
 
@@ -71,6 +75,11 @@ class UP_Settings {
                     case 'enable_meta':
                     case 'enable_tiktok':
                         $out[ $key ] = ( $val === 'yes' ) ? 'yes' : 'no';
+                        break;
+                    case 'rate_limit_ip_per_min':
+                    case 'rate_limit_token_per_min':
+                    case 'retry_after_seconds':
+                        $out[ $key ] = max( 1, intval( $val ) );
                         break;
                     case 'capi_token':
                         // token-like values: sanitize_text_field then trim
@@ -179,6 +188,24 @@ class UP_Settings {
                         <th scope="row"><label for="server_secret">Server Secret</label></th>
                         <td><input name="up_settings[server_secret]" id="server_secret" type="password" value="<?php echo esc_attr( $opts['server_secret'] ); ?>" class="regular-text" />
                         <p class="description">Optional secret for server-to-server ingest (if used, prefer defining <code>UP_SERVER_SECRET</code> in <code>wp-config.php</code>).</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="rate_limit_ip_per_min">Rate limit (IP, per minute)</label></th>
+                        <td><input name="up_settings[rate_limit_ip_per_min]" id="rate_limit_ip_per_min" type="number" min="1" value="<?php echo esc_attr( $opts['rate_limit_ip_per_min'] ); ?>" class="small-text" />
+                        <p class="description">Maximum ingest requests allowed per IP per minute (transient-based).</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="rate_limit_token_per_min">Rate limit (Token, per minute)</label></th>
+                        <td><input name="up_settings[rate_limit_token_per_min]" id="rate_limit_token_per_min" type="number" min="1" value="<?php echo esc_attr( $opts['rate_limit_token_per_min'] ); ?>" class="small-text" />
+                        <p class="description">Maximum ingest requests allowed per token/secret per minute (transient-based). Higher for service tokens.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="retry_after_seconds">Retry-After (seconds)</label></th>
+                        <td><input name="up_settings[retry_after_seconds]" id="retry_after_seconds" type="number" min="1" value="<?php echo esc_attr( $opts['retry_after_seconds'] ); ?>" class="small-text" />
+                        <p class="description">Seconds to return in the Retry-After header when rate-limited.</p>
                         </td>
                     </tr>
                 </table>

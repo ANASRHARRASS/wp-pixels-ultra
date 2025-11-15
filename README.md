@@ -1,8 +1,8 @@
 # Ultra Pixels Ultra
 
-**Version**: 0.2.0
+**Version**: 0.3.0
 
-A WordPress plugin for tracking website events (WooCommerce, custom interactions, WhatsApp) and forwarding them to Meta and TikTok via Conversion API (CAPI) with async queuing and admin observability.
+A production-ready WordPress plugin for tracking website events (WooCommerce, custom interactions, WhatsApp) and forwarding them to Meta and TikTok via Conversion API (CAPI) with secure server-side queuing, batching, dead-letter handling, rate-limiting, and admin observability.
 
 ## Installation
 

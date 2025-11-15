@@ -34,6 +34,10 @@ class UP_Admin {
 			'items_url' => esc_url_raw( rest_url( 'up/v1/queue/items' ) ),
 			'retry_url' => esc_url_raw( rest_url( 'up/v1/queue/retry' ) ),
 			'delete_url' => esc_url_raw( rest_url( 'up/v1/queue/delete' ) ),
+			'deadletter_url' => esc_url_raw( rest_url( 'up/v1/queue/deadletter' ) ),
+			'deadletter_retry_url' => esc_url_raw( rest_url( 'up/v1/queue/deadletter/retry' ) ),
+			'deadletter_delete_url' => esc_url_raw( rest_url( 'up/v1/queue/deadletter/delete' ) ),
+			'logs_url' => esc_url_raw( rest_url( 'up/v1/logs' ) ),
 		) );
 	}
 }

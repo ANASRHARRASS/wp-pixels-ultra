@@ -1,9 +1,8 @@
 <?php
 /**
  * Plugin Name: Ultra Pixels Ultra
- * Description: Boilerplate for a robust GTM / Meta / TikTok / CAPI-ready tracking plugin for WordPress + WooCommerce. Extend integrations and event mapping in includes/.
- * Version: 0.1.0
- * Version: 0.2.0
+ * Description: Production-ready GTM / Meta / TikTok / CAPI tracking & server-side forwarding with queue, dead-letter, rate-limiting, and adapters.
+ * Version: 0.3.0
  * Author: Ultra Boilerplate
  * Text Domain: ultra-pixels-ultra
  */
@@ -18,7 +17,7 @@ define( 'UP_PLUGIN_URL', plugin_dir_url( UP_PLUGIN_FILE ) );
 
 // version constant for asset busting and compatibility checks
 if ( ! defined( 'UP_VERSION' ) ) {
-    define( 'UP_VERSION', '0.2.0' );
+    define( 'UP_VERSION', '0.3.0' );
 }
 
 // always load the loader if present (it wires admin/front)
@@ -140,7 +139,10 @@ register_activation_hook( UP_PLUGIN_FILE, function() {
             attempts SMALLINT NOT NULL DEFAULT 0,
             next_attempt BIGINT(20) DEFAULT 0,
             created_at BIGINT(20) NOT NULL,
-            PRIMARY KEY  (id)
+            PRIMARY KEY  (id),
+            KEY next_attempt (next_attempt),
+            KEY platform (platform),
+            KEY created_at (created_at)
         ) " . $charset_collate . ";";
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         dbDelta( $sql );
@@ -154,15 +156,22 @@ register_activation_hook( UP_PLUGIN_FILE, function() {
             payload LONGTEXT NOT NULL,
             failure_message TEXT DEFAULT NULL,
             failed_at BIGINT(20) NOT NULL,
-            PRIMARY KEY  (id)
+            PRIMARY KEY  (id),
+            KEY failed_at (failed_at)
         ) " . $charset_collate . ";";
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         dbDelta( $sql );
     }
+
+    // Schedule recurring processing as a safety net (hourly)
+    if ( ! wp_next_scheduled( 'up_capi_process_queue' ) ) {
+        wp_schedule_event( time() + 300, 'hourly', 'up_capi_process_queue' );
+    }
 } );
 
 register_deactivation_hook( UP_PLUGIN_FILE, function() {
-    // noop by default; keep settings to allow reactivation
+    // Clear scheduled events on deactivation
+    wp_clear_scheduled_hook( 'up_capi_process_queue' );
 } );
 
 // initialize loader (keeps backwards compatibility with loader implementation)

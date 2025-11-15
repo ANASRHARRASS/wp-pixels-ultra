@@ -19,8 +19,14 @@ class UP_CAPI {
 		), array( '%s', '%s', '%s', '%d', '%d', '%d' ) );
 
 		if ( $inserted ) {
-			if ( ! wp_next_scheduled( 'up_capi_process_queue' ) ) {
-				wp_schedule_single_event( time() + 5, 'up_capi_process_queue' );
+			// Prefer Action Scheduler if available for reliable background processing
+			if ( function_exists( 'as_schedule_single_action' ) ) {
+				// schedule via Action Scheduler (group: up_capi)
+				as_schedule_single_action( time() + 5, 'up_capi_process_queue', array(), 'up_capi' );
+			} else {
+				if ( ! wp_next_scheduled( 'up_capi_process_queue' ) ) {
+					wp_schedule_single_event( time() + 5, 'up_capi_process_queue' );
+				}
 			}
 			return true;
 		}
@@ -38,9 +44,26 @@ class UP_CAPI {
 		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} WHERE (next_attempt = 0 OR next_attempt <= %d) ORDER BY created_at ASC LIMIT %d", $now, $limit ), ARRAY_A );
 		if ( empty( $rows ) ) return 0;
 		$processed = 0;
+		// Group rows by platform for batch sending
+		$groups = array();
 		foreach ( $rows as $row ) {
-			$payload = json_decode( $row['payload'], true );
-			$res = self::send_event( $row['platform'], $row['event_name'], is_array( $payload ) ? $payload : array(), false );
+			$plat = ! empty( $row['platform'] ) ? $row['platform'] : 'generic';
+			if ( ! isset( $groups[ $plat ] ) ) $groups[ $plat ] = array();
+			$groups[ $plat ][] = $row;
+		}
+
+		foreach ( $groups as $plat => $groupRows ) {
+			// build events array and id map
+			$events = array();
+			$id_map = array();
+			foreach ( $groupRows as $r ) {
+				$payload = json_decode( $r['payload'], true );
+				$events[] = is_array( $payload ) ? $payload : array();
+				$id_map[] = $r['id'];
+			}
+
+			// attempt batch send for this platform
+			$res = self::send_batch( $plat, $events );
 			$success = true;
 			if ( is_wp_error( $res ) ) {
 				$success = false;
@@ -54,34 +77,44 @@ class UP_CAPI {
 			}
 
 			if ( $success ) {
-				$wpdb->delete( $table, array( 'id' => $row['id'] ), array( '%d' ) );
+				// delete all successfully sent rows
+				foreach ( $id_map as $del_id ) {
+					$wpdb->delete( $table, array( 'id' => $del_id ), array( '%d' ) );
+					$processed++;
+				}
 			} else {
-				// increment attempts and either reschedule or dead-letter
-				$attempts = intval( $row['attempts'] ) + 1;
-				if ( $attempts >= 5 ) {
-					// move to dead-letter
-					$wpdb->insert( $dl_table, array(
-						'platform' => $row['platform'],
-						'event_name' => $row['event_name'],
-						'payload' => $row['payload'],
-						'failure_message' => isset( $message ) ? $message : 'failed',
-						'failed_at' => $now,
-					), array( '%s', '%s', '%s', '%s', '%d' ) );
-					$wpdb->delete( $table, array( 'id' => $row['id'] ), array( '%d' ) );
-				} else {
-					$next = $now + ( 60 * $attempts );
-					$wpdb->update( $table, array( 'attempts' => $attempts, 'next_attempt' => $next ), array( 'id' => $row['id'] ), array( '%d', '%d' ), array( '%d' ) );
+				// handle failures per-row: increment attempts and maybe dead-letter
+				foreach ( $groupRows as $row ) {
+					$attempts = intval( $row['attempts'] ) + 1;
+					if ( $attempts >= 5 ) {
+						$wpdb->insert( $dl_table, array(
+							'platform' => $row['platform'],
+							'event_name' => $row['event_name'],
+							'payload' => $row['payload'],
+							'failure_message' => isset( $message ) ? $message : 'failed',
+							'failed_at' => $now,
+						), array( '%s', '%s', '%s', '%s', '%d' ) );
+						$wpdb->delete( $table, array( 'id' => $row['id'] ), array( '%d' ) );
+					} else {
+						$next = $now + ( 60 * $attempts );
+						$wpdb->update( $table, array( 'attempts' => $attempts, 'next_attempt' => $next ), array( 'id' => $row['id'] ), array( '%d', '%d' ), array( '%d' ) );
+					}
+					$processed++;
 				}
 			}
-			$processed++;
 		}
 		// record last processed time
 		update_option( 'up_capi_last_processed', $now );
 		// reschedule if work likely remains
 		$remaining = $wpdb->get_var( "SELECT COUNT(1) FROM {$table}" );
 		if ( $remaining && intval( $remaining ) > 0 ) {
-			if ( ! wp_next_scheduled( 'up_capi_process_queue' ) ) {
-				wp_schedule_single_event( time() + 30, 'up_capi_process_queue' );
+			// prefer Action Scheduler if available
+			if ( function_exists( 'as_schedule_single_action' ) ) {
+				as_schedule_single_action( time() + 30, 'up_capi_process_queue', array(), 'up_capi' );
+			} else {
+				if ( ! wp_next_scheduled( 'up_capi_process_queue' ) ) {
+					wp_schedule_single_event( time() + 30, 'up_capi_process_queue' );
+				}
 			}
 		}
 		return $processed;
@@ -120,58 +153,219 @@ class UP_CAPI {
 		return (bool) $wpdb->delete( $table, array( 'id' => intval( $id ) ), array( '%d' ) );
 	}
 
-	public static function send_event( $platform, $event_name, $payload = array(), $blocking = true ) {
-		$endpoint = UP_Settings::get( 'capi_endpoint', '' );
-		$token = UP_Settings::get( 'capi_token', '' );
-		if ( empty( $endpoint ) ) {
-			return new WP_Error( 'no_endpoint', 'CAPI endpoint not configured' );
+	// list dead-letter items
+	public static function list_deadletter( $limit = 20, $offset = 0 ) {
+		global $wpdb;
+		$table = $wpdb->prefix . 'up_capi_deadletter';
+		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} ORDER BY failed_at DESC LIMIT %d OFFSET %d", intval( $limit ), intval( $offset ) ), ARRAY_A );
+		foreach ( $rows as &$r ) {
+			$r['payload'] = json_decode( $r['payload'], true );
 		}
+		return $rows;
+	}
 
-		$body = array(
-			'platform'  => $platform,
-			'event'     => $event_name,
-			'payload'   => $payload,
-			'site'      => home_url(),
-			'timestamp' => time(),
-		);
+	// retry dead-letter item: move back to queue
+	public static function retry_deadletter( $id ) {
+		global $wpdb;
+		$dl_table = $wpdb->prefix . 'up_capi_deadletter';
+		$table = $wpdb->prefix . 'up_capi_queue';
+		$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$dl_table} WHERE id = %d", intval( $id ) ), ARRAY_A );
+		if ( ! $row ) return false;
+		$now = time();
+		$inserted = $wpdb->insert( $table, array(
+			'platform' => substr( (string) $row['platform'], 0, 50 ),
+			'event_name' => substr( (string) $row['event_name'], 0, 191 ),
+			'payload' => $row['payload'],
+			'attempts' => 0,
+			'next_attempt' => 0,
+			'created_at' => $now,
+		), array( '%s', '%s', '%s', '%d', '%d', '%d' ) );
+		if ( $inserted ) {
+			$wpdb->delete( $dl_table, array( 'id' => intval( $id ) ), array( '%d' ) );
+			return true;
+		}
+		return false;
+	}
 
+	// delete dead-letter item permanently
+	public static function delete_deadletter( $id ) {
+		global $wpdb;
+		$dl_table = $wpdb->prefix . 'up_capi_deadletter';
+		return (bool) $wpdb->delete( $dl_table, array( 'id' => intval( $id ) ), array( '%d' ) );
+	}
+
+	// return recent logs stored in option
+	public static function get_logs() {
+		$log = get_option( 'up_capi_log', array() );
+		if ( ! is_array( $log ) ) return array();
+		return array_slice( array_reverse( $log ), 0, 100 );
+	}
+
+	public static function send_event( $platform, $event_name, $payload = array(), $blocking = true ) {
+		// Dispatch to platform-specific adapters when possible
+		$enable_meta = UP_Settings::get( 'enable_meta', 'no' ) === 'yes';
+		$meta_id = UP_Settings::get( 'meta_pixel_id', '' );
+		$enable_tiktok = UP_Settings::get( 'enable_tiktok', 'no' ) === 'yes';
+		$tiktok_id = UP_Settings::get( 'tiktok_pixel_id', '' );
+		$token = UP_Settings::get( 'capi_token', '' );
+
+		try {
+			if ( $platform === 'meta' || ( $enable_meta && $meta_id && $platform === 'generic' ) ) {
+				return self::send_to_meta( $meta_id, $token, array( array_merge( array( 'event_name' => $event_name ), $payload ) ), $blocking );
+			}
+			if ( $platform === 'tiktok' || ( $enable_tiktok && $tiktok_id && $platform === 'generic' ) ) {
+				return self::send_to_tiktok( $tiktok_id, $token, array( array_merge( array( 'event_name' => $event_name ), $payload ) ), $blocking );
+			}
+			// Fallback: forward to configured generic CAPI endpoint
+			$endpoint = UP_Settings::get( 'capi_endpoint', '' );
+			if ( empty( $endpoint ) ) {
+				return new WP_Error( 'no_endpoint', 'CAPI endpoint not configured' );
+			}
+			$body = array(
+				'platform'  => $platform,
+				'event'     => $event_name,
+				'payload'   => $payload,
+				'site'      => home_url(),
+				'timestamp' => time(),
+			);
+			$args = array(
+				'timeout'  => 15,
+				'headers'  => array(
+					'Content-Type' => 'application/json',
+					'Accept'       => 'application/json',
+				),
+				'body'     => wp_json_encode( $body ),
+				'blocking' => (bool) $blocking,
+			);
+			if ( ! empty( $token ) ) {
+				$args['headers']['Authorization'] = 'Bearer ' . $token;
+			}
+			$response = wp_remote_post( $endpoint, $args );
+			return $response;
+		} catch ( Exception $e ) {
+			return new WP_Error( 'send_exception', $e->getMessage() );
+		}
+	}
+
+	/**
+	 * Batch sender: platform => events array
+	 */
+	protected static function send_batch( $platform, $events = array() ) {
+		if ( empty( $events ) ) return new WP_Error( 'no_events', 'No events to send' );
+		$token = UP_Settings::get( 'capi_token', '' );
+		$meta_id = UP_Settings::get( 'meta_pixel_id', '' );
+		$tiktok_id = UP_Settings::get( 'tiktok_pixel_id', '' );
+		if ( $platform === 'meta' && $meta_id ) {
+			return self::send_to_meta( $meta_id, $token, $events, true );
+		}
+		if ( $platform === 'tiktok' && $tiktok_id ) {
+			return self::send_to_tiktok( $tiktok_id, $token, $events, true );
+		}
+		// fallback: send each event to generic endpoint individually
+		$last = null;
+		foreach ( $events as $ev ) {
+			$last = self::send_event( $platform, isset( $ev['event_name'] ) ? $ev['event_name'] : 'event', $ev, true );
+		}
+		return $last;
+	}
+
+	/**
+	 * Send events to Meta Pixel via Graph API (batch)
+	 */
+	protected static function send_to_meta( $pixel_id, $access_token, $events = array(), $blocking = true ) {
+		$url = 'https://graph.facebook.com/v17.0/' . rawurlencode( $pixel_id ) . '/events?access_token=' . rawurlencode( $access_token );
+		$data = array();
+		foreach ( $events as $e ) {
+			$item = array(
+				'event_name' => isset( $e['event_name'] ) ? $e['event_name'] : ( isset( $e['event'] ) ? $e['event'] : 'event' ),
+				'event_time' => isset( $e['event_time'] ) ? intval( $e['event_time'] ) : time(),
+				'event_id' => isset( $e['event_id'] ) ? $e['event_id'] : uniqid( 'ev_', true ),
+				'user_data' => array(),
+				'custom_data' => isset( $e['custom_data'] ) ? $e['custom_data'] : new stdClass(),
+				'action_source' => isset( $e['action_source'] ) ? $e['action_source'] : 'website',
+			);
+			// Attempt to attach source URL if provided
+			if ( isset( $e['event_source_url'] ) ) {
+				$item['event_source_url'] = esc_url_raw( $e['event_source_url'] );
+			} elseif ( isset( $e['source_url'] ) ) {
+				$item['event_source_url'] = esc_url_raw( $e['source_url'] );
+			} elseif ( isset( $e['custom_data']['source_url'] ) ) {
+				$item['event_source_url'] = esc_url_raw( $e['custom_data']['source_url'] );
+			}
+			if ( isset( $e['user_data'] ) && is_array( $e['user_data'] ) ) {
+				foreach ( $e['user_data'] as $k => $v ) {
+					if ( $k === 'email_hash' ) $item['user_data']['em'] = $v;
+					elseif ( $k === 'phone_hash' ) $item['user_data']['ph'] = $v;
+					else $item['user_data'][ $k ] = $v;
+				}
+			}
+			$data[] = $item;
+		}
+		$body = array( 'data' => $data );
 		$args = array(
-			'timeout'  => 15,
-			'headers'  => array(
-				'Content-Type' => 'application/json',
-				'Accept'       => 'application/json',
-			),
-			'body'     => wp_json_encode( $body ),
+			'headers' => array( 'Content-Type' => 'application/json' ),
+			'body' => wp_json_encode( $body ),
+			'timeout' => 20,
 			'blocking' => (bool) $blocking,
 		);
-
-		if ( ! empty( $token ) ) {
-			$args['headers']['Authorization'] = 'Bearer ' . $token;
+		$response = wp_remote_post( $url, $args );
+		if ( is_wp_error( $response ) ) {
+			self::log( 'error', 'Meta send error: ' . $response->get_error_message() );
 		}
+		return $response;
+	}
 
-		$attempts = 0;
-		$max = $blocking ? 2 : 1;
-		$last_response = null;
-		while ( $attempts < $max ) {
-			$attempts++;
-			$response = wp_remote_post( $endpoint, $args );
-			$last_response = $response;
-			if ( is_wp_error( $response ) ) {
-				self::log( 'error', sprintf( 'CAPI: attempt %d error: %s', $attempts, $response->get_error_message() ) );
-				if ( $attempts < $max ) sleep(1);
-				continue;
+	/**
+	 * Send events to TikTok Pixel API (best-effort minimal implementation)
+	 */
+	protected static function send_to_tiktok( $pixel_id, $access_token, $events = array(), $blocking = true ) {
+		// Use TikTok Business API endpoint; structure may need adjustment by integrator
+		$url = 'https://business-api.tiktok.com/open_api/v1.2/pixel/track/';
+		$body = array( 'pixel_code' => $pixel_id, 'event_list' => array() );
+		foreach ( $events as $e ) {
+			$item = array(
+				'event' => isset( $e['event_name'] ) ? $e['event_name'] : ( isset( $e['event'] ) ? $e['event'] : 'event' ),
+				'event_time' => isset( $e['event_time'] ) ? intval( $e['event_time'] ) : time(),
+				'event_id' => isset( $e['event_id'] ) ? $e['event_id'] : uniqid( 'ev_', true ),
+				'properties' => is_array( $e['custom_data'] ) ? $e['custom_data'] : ( is_object( $e['custom_data'] ) ? (array) $e['custom_data'] : array() ),
+				'user' => array(),
+			);
+			// Attach source URL into properties if available
+			if ( isset( $e['source_url'] ) && empty( $item['properties']['url'] ) ) {
+				$item['properties']['url'] = esc_url_raw( $e['source_url'] );
 			}
-			$code = wp_remote_retrieve_response_code( $response );
-			if ( $code >= 200 && $code < 300 ) {
-				self::log( 'info', sprintf( 'CAPI success [%s] event=%s', $platform, $event_name ) );
-				return $response;
-			} else {
-				self::log( 'error', sprintf( 'CAPI: attempt %d HTTP %d', $attempts, $code ) );
-				if ( $attempts < $max ) sleep(1);
-				continue;
+			if ( isset( $e['user_data'] ) && is_array( $e['user_data'] ) ) {
+				foreach ( $e['user_data'] as $k => $v ) {
+					if ( $k === 'email_hash' ) $item['user']['em'] = $v;
+					elseif ( $k === 'phone_hash' ) $item['user']['ph'] = $v;
+					else $item['user'][ $k ] = $v;
+				}
+			}
+			$body['event_list'][] = $item;
+		}
+		$headers = array( 'Content-Type' => 'application/json' );
+		if ( ! empty( $access_token ) ) {
+			// TikTok accepts access_token either in query or header depending on setup; prefer header for privacy
+			$headers['Access-Token'] = $access_token;
+		}
+		$args = array(
+			'headers' => $headers,
+			'body' => wp_json_encode( $body ),
+			'timeout' => 20,
+			'blocking' => (bool) $blocking,
+		);
+		$response = wp_remote_post( $url, $args );
+		if ( is_wp_error( $response ) ) {
+			self::log( 'error', 'TikTok send error: ' . $response->get_error_message() );
+		}
+		// Log non-2xx responses for visibility
+		if ( is_array( $response ) && isset( $response['response']['code'] ) ) {
+			$code = intval( $response['response']['code'] );
+			if ( $code < 200 || $code >= 300 ) {
+				self::log( 'error', sprintf( 'TikTok HTTP %d: %s', $code, wp_json_encode( array( 'body' => $body ) ) ) );
 			}
 		}
-		return $last_response;
+		return $response;
 	}
 
 	protected static function log( $level, $message ) {

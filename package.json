@@ -1,6 +1,6 @@
 {
   "name": "wp-pixels-ultra",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "WordPress plugin scaffold for server-side pixel forwarding and Conversions API (CAPI) integration",
   "main": "wp-pixels-ultra.php",
   "scripts": {
