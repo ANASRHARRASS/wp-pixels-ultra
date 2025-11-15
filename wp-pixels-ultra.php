@@ -3,7 +3,7 @@
  * Plugin Name: Ultra Pixels Ultra
  * Description: Production-ready GTM / Meta / TikTok / CAPI tracking & server-side forwarding with queue, dead-letter, rate-limiting, and adapters.
  * Version: 0.3.0
- * Author: Ultra Boilerplate
+ * Author: anas
  * Text Domain: ultra-pixels-ultra
  */
 
@@ -11,6 +11,13 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
+ * Requires PHP: 7.4
+ * Requires at least: 5.8
+ * Tested up to: 6.6
+ * GitHub Plugin URI: https://github.com/ANASRHARRASS/wp-pixels-ultra
+ * Primary Branch: main
+ * Release Asset: true
+ * Update URI: anasrharrass/wp-pixels-ultra
 define( 'UP_PLUGIN_FILE', __FILE__ );
 define( 'UP_PLUGIN_DIR', plugin_dir_path( UP_PLUGIN_FILE ) );
 define( 'UP_PLUGIN_URL', plugin_dir_url( UP_PLUGIN_FILE ) );

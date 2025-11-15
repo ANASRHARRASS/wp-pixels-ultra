@@ -31,8 +31,9 @@
         first.parentNode.insertBefore(s, first);
     }
 
-    // Build a simple PageView event and fire
+    // Build a simple PageView event and fire (now GTM-friendly with event key)
     var event = {
+        event: 'up_event',
         event_name: 'PageView',
         event_id: generateEventId(),
         event_time: Math.floor(Date.now() / 1000),
@@ -56,6 +57,10 @@
     if (typeof UP_CONFIG !== 'undefined' && UP_CONFIG.tiktok_pixel_id) {
         (function (w, d, t) { w.TiktokAnalyticsObject = t; var ttq = w[t] = w[t] || []; ttq.methods = ['page', 'track']; ttq.setAndDefer = function (n, e) { n[e] = function () { n.push([e].concat(Array.prototype.slice.call(arguments, 0))) } }; for (var i = 0; i < ttq.methods.length; i++)ttq.setAndDefer(ttq, ttq.methods[i]); ttq.load = function (e) { var s = document.createElement('script'); s.type = 'text/javascript'; s.async = true; s.src = 'https://analytics.tiktok.com/i18n/pixel/events.js?sdkid=' + e; var a = document.getElementsByTagName('script')[0]; a.parentNode.insertBefore(s, a) }; ttq.load(UP_CONFIG.tiktok_pixel_id); ttq.page(); })(window, document, 'ttq');
     }
+
+    // Push to dataLayer for GTM first
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push(event);
 
     // Fire server copy
     sendToServer(event);
@@ -108,6 +113,7 @@
             if (!eventName) return;
 
             var ev = {
+                event: 'up_event',
                 event_name: eventName,
                 event_id: generateEventId(),
                 event_time: Math.floor(Date.now() / 1000),
@@ -116,7 +122,7 @@
                 custom_data: payload
             };
 
-            // push to dataLayer for GTM if present
+            // push to dataLayer for GTM
             window.dataLayer = window.dataLayer || [];
             window.dataLayer.push(ev);
 

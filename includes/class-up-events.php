@@ -19,6 +19,14 @@ class UP_Events {
 	}
 
 	public static function push_data_layer( $data = array() ) {
+		// Normalize to GTM custom event schema
+		if ( ! isset( $data['event'] ) ) {
+			$data['event'] = 'up_event';
+		}
+		// Backwards compatibility: if legacy 'event' value was the business event name, copy into event_name
+		if ( ! isset( $data['event_name'] ) && isset( $data['event'] ) && $data['event'] !== 'up_event' ) {
+			$data['event_name'] = $data['event'];
+		}
 		echo '<script>window.dataLayer = window.dataLayer || []; window.dataLayer.push(' . wp_json_encode( $data ) . ');</script>';
 	}
 
@@ -62,7 +70,9 @@ class UP_Events {
 		}
 
 		$dl = array(
-			'event' => 'purchase',
+			'event' => 'up_event',
+			'event_name' => 'purchase',
+			'event_id' => 'order_' . $order->get_id(),
 			'transaction_id' => $order->get_id(),
 			'value' => $total,
 			'currency' => $currency,
@@ -71,6 +81,7 @@ class UP_Events {
 		self::push_data_layer( $dl );
 
 		$payload = array(
+			'event_id' => 'order_' . $order->get_id(),
 			'transaction_id' => $order->get_id(),
 			'value' => $total,
 			'currency' => $currency,
@@ -91,7 +102,8 @@ class UP_Events {
 			$price = $product ? (float) $product->get_price() : 0.0;
 
 			$dl = array(
-				'event' => 'add_to_cart',
+				'event' => 'up_event',
+				'event_name' => 'add_to_cart',
 				'product_id' => $product_id,
 				'value' => $price,
 				'quantity' => $quantity,
@@ -125,7 +137,8 @@ class UP_Events {
 		}
 
 		$dl = array(
-			'event' => 'begin_checkout',
+			'event' => 'up_event',
+			'event_name' => 'begin_checkout',
 			'value' => $total,
 			'currency' => $currency,
 			'contents' => $items,
@@ -148,7 +161,8 @@ class UP_Events {
 			$price = $product ? (float) $product->get_price() : 0.0;
 
 			$dl = array(
-				'event' => 'view_item',
+				'event' => 'up_event',
+				'event_name' => 'view_item',
 				'product_id' => $product_id,
 				'value' => $price,
 			);
@@ -167,7 +181,8 @@ class UP_Events {
 		// product listing / shop / category
 		if ( ( function_exists( 'is_shop' ) && is_shop() ) || ( function_exists( 'is_product_category' ) && is_product_category() ) ) {
 			$dl = array(
-				'event' => 'view_item_list',
+				'event' => 'up_event',
+				'event_name' => 'view_item_list',
 				'page' => '',
 			);
 			add_action( 'wp_head', function() use ( $dl ) {
