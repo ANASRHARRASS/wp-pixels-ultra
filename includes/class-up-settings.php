@@ -16,14 +16,23 @@ class UP_Settings {
             'purchase' => array(
                 'meta' => array( 'event_name' => 'Purchase', 'include_user_data' => true ),
                 'tiktok' => array( 'event_name' => 'PlaceAnOrder', 'include_user_data' => true ),
+                'google_ads' => array( 'event_name' => 'conversion', 'include_user_data' => true ),
+                'snapchat' => array( 'event_name' => 'PURCHASE', 'include_user_data' => true ),
+                'pinterest' => array( 'event_name' => 'checkout', 'include_user_data' => true ),
             ),
             'add_to_cart' => array(
                 'meta' => array( 'event_name' => 'AddToCart', 'include_user_data' => false ),
                 'tiktok' => array( 'event_name' => 'AddToCart', 'include_user_data' => false ),
+                'google_ads' => array( 'event_name' => 'add_to_cart', 'include_user_data' => false ),
+                'snapchat' => array( 'event_name' => 'ADD_CART', 'include_user_data' => false ),
+                'pinterest' => array( 'event_name' => 'add_to_cart', 'include_user_data' => false ),
             ),
             'view_item' => array(
                 'meta' => array( 'event_name' => 'ViewContent', 'include_user_data' => false ),
                 'tiktok' => array( 'event_name' => 'ViewContent', 'include_user_data' => false ),
+                'google_ads' => array( 'event_name' => 'view_item', 'include_user_data' => false ),
+                'snapchat' => array( 'event_name' => 'VIEW_CONTENT', 'include_user_data' => false ),
+                'pinterest' => array( 'event_name' => 'page_visit', 'include_user_data' => false ),
             ),
             'view_item_list' => array(
                 'meta' => array( 'event_name' => 'ViewCategory', 'include_user_data' => false ),
@@ -32,23 +41,41 @@ class UP_Settings {
             'begin_checkout' => array(
                 'meta' => array( 'event_name' => 'InitiateCheckout', 'include_user_data' => false ),
                 'tiktok' => array( 'event_name' => 'InitiateCheckout', 'include_user_data' => false ),
+                'google_ads' => array( 'event_name' => 'begin_checkout', 'include_user_data' => false ),
+                'snapchat' => array( 'event_name' => 'START_CHECKOUT', 'include_user_data' => false ),
             ),
             'whatsapp_initiate' => array(
                 'meta' => array( 'event_name' => 'Contact', 'include_user_data' => true ),
                 'tiktok' => array( 'event_name' => 'Contact', 'include_user_data' => true ),
+                'google_ads' => array( 'event_name' => 'conversion', 'include_user_data' => true ),
             ),
             'whatsapp_click' => array(
                 'meta' => array( 'event_name' => 'Lead', 'include_user_data' => true ),
                 'tiktok' => array( 'event_name' => 'Lead', 'include_user_data' => true ),
+                'google_ads' => array( 'event_name' => 'conversion', 'include_user_data' => true ),
+                'snapchat' => array( 'event_name' => 'SIGN_UP', 'include_user_data' => true ),
+            ),
+            'form_submit' => array(
+                'meta' => array( 'event_name' => 'Lead', 'include_user_data' => true ),
+                'tiktok' => array( 'event_name' => 'SubmitForm', 'include_user_data' => true ),
+                'google_ads' => array( 'event_name' => 'conversion', 'include_user_data' => true ),
+                'snapchat' => array( 'event_name' => 'SIGN_UP', 'include_user_data' => true ),
             ),
         );
         return array(
             'gtm_container_id'  => '',
             'meta_pixel_id'     => '',
             'tiktok_pixel_id'   => '',
+            'google_ads_id'     => '',
+            'snapchat_pixel_id' => '',
+            'pinterest_tag_id'  => '',
             'enable_gtm'        => 'no',
             'enable_meta'       => 'no',
             'enable_tiktok'     => 'no',
+            'enable_google_ads' => 'no',
+            'enable_snapchat'   => 'no',
+            'enable_pinterest'  => 'no',
+            'gtm_server_url'    => '',
             'server_secret'     => '',
             'capi_endpoint'     => '',
             'capi_token'        => '',
@@ -74,6 +101,9 @@ class UP_Settings {
                     case 'enable_gtm':
                     case 'enable_meta':
                     case 'enable_tiktok':
+                    case 'enable_google_ads':
+                    case 'enable_snapchat':
+                    case 'enable_pinterest':
                         $out[ $key ] = ( $val === 'yes' ) ? 'yes' : 'no';
                         break;
                     case 'rate_limit_ip_per_min':
@@ -86,6 +116,7 @@ class UP_Settings {
                         $out[ $key ] = sanitize_text_field( trim( $val ) );
                         break;
                     case 'capi_endpoint':
+                    case 'gtm_server_url':
                         $out[ $key ] = esc_url_raw( trim( $val ) );
                         break;
                     default:
@@ -174,6 +205,53 @@ class UP_Settings {
                                 <option value="no" <?php selected( $opts['enable_tiktok'], 'no' ); ?>>No</option>
                                 <option value="yes" <?php selected( $opts['enable_tiktok'], 'yes' ); ?>>Yes</option>
                             </select>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="google_ads_id">Google Ads Conversion ID</label></th>
+                        <td><input name="up_settings[google_ads_id]" id="google_ads_id" type="text" value="<?php echo esc_attr( $opts['google_ads_id'] ); ?>" class="regular-text" />
+                        <p class="description">Enter your Google Ads Conversion ID (AW-XXXXXXXXX)</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="enable_google_ads">Enable Google Ads</label></th>
+                        <td>
+                            <select name="up_settings[enable_google_ads]" id="enable_google_ads">
+                                <option value="no" <?php selected( $opts['enable_google_ads'], 'no' ); ?>>No</option>
+                                <option value="yes" <?php selected( $opts['enable_google_ads'], 'yes' ); ?>>Yes</option>
+                            </select>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="snapchat_pixel_id">Snapchat Pixel ID</label></th>
+                        <td><input name="up_settings[snapchat_pixel_id]" id="snapchat_pixel_id" type="text" value="<?php echo esc_attr( $opts['snapchat_pixel_id'] ); ?>" class="regular-text" /></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="enable_snapchat">Enable Snapchat</label></th>
+                        <td>
+                            <select name="up_settings[enable_snapchat]" id="enable_snapchat">
+                                <option value="no" <?php selected( $opts['enable_snapchat'], 'no' ); ?>>No</option>
+                                <option value="yes" <?php selected( $opts['enable_snapchat'], 'yes' ); ?>>Yes</option>
+                            </select>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="pinterest_tag_id">Pinterest Tag ID</label></th>
+                        <td><input name="up_settings[pinterest_tag_id]" id="pinterest_tag_id" type="text" value="<?php echo esc_attr( $opts['pinterest_tag_id'] ); ?>" class="regular-text" /></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="enable_pinterest">Enable Pinterest</label></th>
+                        <td>
+                            <select name="up_settings[enable_pinterest]" id="enable_pinterest">
+                                <option value="no" <?php selected( $opts['enable_pinterest'], 'no' ); ?>>No</option>
+                                <option value="yes" <?php selected( $opts['enable_pinterest'], 'yes' ); ?>>Yes</option>
+                            </select>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="gtm_server_url">GTM Server Container URL</label></th>
+                        <td><input name="up_settings[gtm_server_url]" id="gtm_server_url" type="text" value="<?php echo esc_attr( $opts['gtm_server_url'] ); ?>" class="regular-text" />
+                        <p class="description">Optional: Enter your server-side GTM container URL for enhanced measurement</p>
                         </td>
                     </tr>
                     <tr>

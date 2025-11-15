@@ -49,13 +49,66 @@
 
     // Inject Meta Pixel (minimal) if configured
     if (typeof UP_CONFIG !== 'undefined' && UP_CONFIG.meta_pixel_id) {
-        (function (f, b, e, v, n, t, s) { if (f.fbq) return; n = f.fbq = function () { n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments) }; if (!f._fbq) f._fbq = n; n.push = n; n.loaded = !0; n.version = '2.0'; n.queue = []; t = b.createElement(e); t.async = !0; t.src = v; s = b.getElementsByTagName(e)[0]; s.parentNode.insertBefore(t, s) })(window, document, 'script', 'https://connect.facebook.net/en_US/fbevents.js');
-        try { window.fbq('init', UP_CONFIG.meta_pixel_id); window.fbq('track', 'PageView'); } catch (e) { }
+        (function (f, b, e, v, n, t, s) {
+            if (f.fbq) return;
+            n = f.fbq = function () { n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments); };
+            if (!f._fbq) f._fbq = n;
+            n.push = n; n.loaded = true; n.version = '2.0'; n.queue = [];
+            t = b.createElement(e); t.async = true; t.src = v;
+            s = b.getElementsByTagName(e)[0]; s.parentNode.insertBefore(t, s);
+        })(window, document, 'script', 'https://connect.facebook.net/en_US/fbevents.js');
+        try { window.fbq('init', UP_CONFIG.meta_pixel_id); window.fbq('track', 'PageView'); } catch (err) { /* ignore */ }
     }
 
     // Inject TikTok Pixel (minimal) if configured
     if (typeof UP_CONFIG !== 'undefined' && UP_CONFIG.tiktok_pixel_id) {
-        (function (w, d, t) { w.TiktokAnalyticsObject = t; var ttq = w[t] = w[t] || []; ttq.methods = ['page', 'track']; ttq.setAndDefer = function (n, e) { n[e] = function () { n.push([e].concat(Array.prototype.slice.call(arguments, 0))) } }; for (var i = 0; i < ttq.methods.length; i++)ttq.setAndDefer(ttq, ttq.methods[i]); ttq.load = function (e) { var s = document.createElement('script'); s.type = 'text/javascript'; s.async = true; s.src = 'https://analytics.tiktok.com/i18n/pixel/events.js?sdkid=' + e; var a = document.getElementsByTagName('script')[0]; a.parentNode.insertBefore(s, a) }; ttq.load(UP_CONFIG.tiktok_pixel_id); ttq.page(); })(window, document, 'ttq');
+        (function (w, d, t) {
+            w.TiktokAnalyticsObject = t;
+            var ttq = w[t] = w[t] || [];
+            ttq.methods = ['page', 'track'];
+            ttq.setAndDefer = function (n, e) { n[e] = function () { n.push([e].concat(Array.prototype.slice.call(arguments, 0))); }; };
+            for (var i = 0; i < ttq.methods.length; i++) { ttq.setAndDefer(ttq, ttq.methods[i]); }
+            ttq.load = function (e) {
+                var s = document.createElement('script');
+                s.type = 'text/javascript'; s.async = true;
+                s.src = 'https://analytics.tiktok.com/i18n/pixel/events.js?sdkid=' + e;
+                var a = document.getElementsByTagName('script')[0];
+                a.parentNode.insertBefore(s, a);
+            };
+            ttq.load(UP_CONFIG.tiktok_pixel_id);
+            ttq.page();
+        })(window, document, 'ttq');
+    }
+
+    // Inject Snapchat Pixel if configured
+    if (typeof UP_CONFIG !== 'undefined' && UP_CONFIG.snapchat_pixel_id) {
+        (function (e, t, n) {
+            if (e.snaptr) return;
+            var a = e.snaptr = function () { a.handleRequest ? a.handleRequest.apply(a, arguments) : a.queue.push(arguments); };
+            a.queue = [];
+            var s = 'script';
+            var r = t.createElement(s);
+            r.async = true; r.src = n;
+            var u = t.getElementsByTagName(s)[0];
+            u.parentNode.insertBefore(r, u);
+        })(window, document, 'https://sc-static.net/scevent.min.js');
+        try { window.snaptr('init', UP_CONFIG.snapchat_pixel_id); window.snaptr('track', 'PAGE_VIEW'); } catch (err) { /* ignore */ }
+    }
+
+    // Inject Pinterest Tag if configured
+    if (typeof UP_CONFIG !== 'undefined' && UP_CONFIG.pinterest_tag_id) {
+        (function (e) {
+            if (!window.pintrk) {
+                window.pintrk = function () { window.pintrk.queue.push(Array.prototype.slice.call(arguments)); };
+                var n = window.pintrk;
+                n.queue = []; n.version = '3.0';
+                var t = document.createElement('script');
+                t.async = true; t.src = e;
+                var r = document.getElementsByTagName('script')[0];
+                r.parentNode.insertBefore(t, r);
+            }
+        })('https://s.pinimg.com/ct/core.js');
+        try { window.pintrk('load', UP_CONFIG.pinterest_tag_id); window.pintrk('page'); } catch (err) { /* ignore */ }
     }
 
     // Push to dataLayer for GTM first

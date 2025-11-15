@@ -45,8 +45,12 @@ class UP_Loader {
                     'ingest_url' => esc_url_raw( rest_url( 'up/v1/ingest' ) ),
                     'nonce'      => wp_create_nonce( 'wp_rest' ),
                     'gtm_id'     => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'gtm_container_id', '' ) : '',
+                    'gtm_server_url' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'gtm_server_url', '' ) : '',
                     'meta_pixel_id' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'meta_pixel_id', '' ) : '',
                     'tiktok_pixel_id' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'tiktok_pixel_id', '' ) : '',
+                    'google_ads_id' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'google_ads_id', '' ) : '',
+                    'snapchat_pixel_id' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'snapchat_pixel_id', '' ) : '',
+                    'pinterest_tag_id' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'pinterest_tag_id', '' ) : '',
                     // NOTE: server_secret is intentionally NOT exposed to client-side.
                 ) );
             }
