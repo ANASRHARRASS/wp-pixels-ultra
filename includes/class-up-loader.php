@@ -14,7 +14,7 @@ class UP_Loader {
             'file' => 'class-up-events.php',
         );
         // include if present
-        foreach ( array( 'class-up-settings.php', 'class-up-admin.php', 'class-up-front.php', 'class-up-capi.php', 'class-up-events.php' ) as $f ) {
+        foreach ( array( 'class-up-settings.php', 'class-up-admin.php', 'class-up-front.php', 'class-up-capi.php', 'class-up-events.php', 'class-up-elementor.php' ) as $f ) {
             $path = $inc_dir . $f;
             if ( file_exists( $path ) ) {
                 require_once $path;
@@ -45,8 +45,12 @@ class UP_Loader {
                     'ingest_url' => esc_url_raw( rest_url( 'up/v1/ingest' ) ),
                     'nonce'      => wp_create_nonce( 'wp_rest' ),
                     'gtm_id'     => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'gtm_container_id', '' ) : '',
+                    'gtm_server_url' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'gtm_server_url', '' ) : '',
                     'meta_pixel_id' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'meta_pixel_id', '' ) : '',
                     'tiktok_pixel_id' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'tiktok_pixel_id', '' ) : '',
+                    'google_ads_id' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'google_ads_id', '' ) : '',
+                    'snapchat_pixel_id' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'snapchat_pixel_id', '' ) : '',
+                    'pinterest_tag_id' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'pinterest_tag_id', '' ) : '',
                     // NOTE: server_secret is intentionally NOT exposed to client-side.
                 ) );
             }
@@ -56,6 +60,11 @@ class UP_Loader {
         if ( class_exists( 'UP_Events' ) ) {
             // UP_Events::init will add its own hooks
             UP_Events::init();
+        }
+        
+        // Elementor integration
+        if ( class_exists( 'UP_Elementor' ) ) {
+            UP_Elementor::init();
         }
 
         // register WP REST routes if a REST helper exists

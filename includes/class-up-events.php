@@ -27,27 +27,85 @@ class UP_Events {
 		if ( ! isset( $data['event_name'] ) && isset( $data['event'] ) && $data['event'] !== 'up_event' ) {
 			$data['event_name'] = $data['event'];
 		}
+		
+		// Add Enhanced Ecommerce data for GA4 compatibility if not already present
+		if ( ! isset( $data['ecommerce'] ) && isset( $data['contents'] ) && is_array( $data['contents'] ) ) {
+			$ecommerce = array();
+			
+			// Build items array in GA4 format
+			$items = array();
+			foreach ( $data['contents'] as $content ) {
+				$item = array(
+					'item_id' => isset( $content['id'] ) ? (string) $content['id'] : '',
+					'quantity' => isset( $content['quantity'] ) ? intval( $content['quantity'] ) : 1,
+					'price' => isset( $content['item_price'] ) ? (float) $content['item_price'] : 0,
+				);
+				// Add product name if available
+				if ( isset( $content['name'] ) ) {
+					$item['item_name'] = $content['name'];
+				} elseif ( isset( $content['id'] ) && function_exists( 'wc_get_product' ) ) {
+					$product = wc_get_product( $content['id'] );
+					if ( $product ) {
+						$item['item_name'] = $product->get_name();
+					}
+				}
+				$items[] = $item;
+			}
+			
+			$ecommerce['items'] = $items;
+			
+			// Add transaction-level data if available
+			if ( isset( $data['transaction_id'] ) ) {
+				$ecommerce['transaction_id'] = (string) $data['transaction_id'];
+			}
+			if ( isset( $data['value'] ) ) {
+				$ecommerce['value'] = (float) $data['value'];
+			}
+			if ( isset( $data['currency'] ) ) {
+				$ecommerce['currency'] = (string) $data['currency'];
+			}
+			
+			$data['ecommerce'] = $ecommerce;
+		}
+		
+		// Ensure event_time is set for server-side tracking
+		if ( ! isset( $data['event_time'] ) ) {
+			$data['event_time'] = time();
+		}
+		
 		echo '<script>window.dataLayer = window.dataLayer || []; window.dataLayer.push(' . wp_json_encode( $data ) . ');</script>';
 	}
 
 	public static function send_to_capi_for_platforms( $event_key, $payload ) {
 		$map = self::get_mapping();
+		$supported_platforms = array( 'meta', 'tiktok', 'google_ads', 'snapchat', 'pinterest' );
+		
 		if ( ! isset( $map[ $event_key ] ) ) {
-			UP_CAPI::send_event( 'meta', ucfirst( $event_key ), $payload, false );
-			UP_CAPI::send_event( 'tiktok', ucfirst( $event_key ), $payload, false );
+			// Default: send to enabled platforms with generic event name
+			foreach ( $supported_platforms as $platform ) {
+				$enable_key = 'enable_' . $platform;
+				if ( UP_Settings::get( $enable_key, 'no' ) === 'yes' ) {
+					UP_CAPI::enqueue_event( $platform, ucfirst( $event_key ), $payload );
+				}
+			}
 			return;
 		}
 
 		$platforms = $map[ $event_key ];
 		foreach ( $platforms as $platform => $cfg ) {
-				if ( in_array( $platform, array( 'meta', 'tiktok' ), true ) ) {
-					$event_name = isset( $cfg['event_name'] ) ? $cfg['event_name'] : ( isset( $cfg['event'] ) ? $cfg['event'] : ucfirst( $event_key ) );
+			if ( in_array( $platform, $supported_platforms, true ) ) {
+				$event_name = isset( $cfg['event_name'] ) ? $cfg['event_name'] : ( isset( $cfg['event'] ) ? $cfg['event'] : ucfirst( $event_key ) );
+				
+				// Check if platform is enabled
+				$enable_key = 'enable_' . $platform;
+				if ( UP_Settings::get( $enable_key, 'no' ) === 'yes' ) {
 					if ( method_exists( 'UP_CAPI', 'enqueue_event' ) ) {
 						UP_CAPI::enqueue_event( $platform, $event_name, $payload );
 					} else {
 						UP_CAPI::send_event( $platform, $event_name, $payload, false );
 					}
 				}
+			}
 		}
 	}
 

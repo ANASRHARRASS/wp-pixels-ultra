@@ -2,32 +2,80 @@
 
 **Version**: 0.3.0
 
-A production-ready WordPress plugin for tracking website events (WooCommerce, custom interactions, WhatsApp) and forwarding them to Meta and TikTok via Conversion API (CAPI) with secure server-side queuing, batching, dead-letter handling, rate-limiting, and admin observability.
+A production-ready WordPress plugin for **GTM-first tracking** with comprehensive support for Meta, TikTok, Google Ads, Snapchat, Pinterest, and custom platforms. Features server-side CAPI forwarding, Enhanced Ecommerce, Elementor integration, automatic form tracking, and enterprise-grade queue management.
+
+## ✨ New in v0.3.0
+
+- 🎯 **GTM-First Architecture**: Complete GTM container templates with pre-configured tags, triggers, and variables
+- 🌐 **Multi-Platform Support**: Meta, TikTok, Google Ads, Snapchat, Pinterest (easily extensible)
+- 📊 **Enhanced Ecommerce**: GA4-compatible dataLayer events with full ecommerce data
+- 🎨 **Elementor Integration**: Automatic tracking for popups, forms, buttons, and widgets
+- 📝 **Smart Form Detection**: Auto-track all form submissions and search queries
+- 📏 **Scroll Depth Tracking**: Monitor user engagement at 25%, 50%, 75%, 90%
+- 📖 **Comprehensive Documentation**: Step-by-step GTM setup guide with best practices
 
 ## Installation
 
 1. Copy the `wp-pixels-ultra/` folder into `wp-content/plugins/`.
 2. Activate the plugin from WordPress Admin > Plugins.
-3. Go to **Ultra Pixels > Settings** to configure GTM, Meta, TikTok, and CAPI endpoints.
+3. Go to **Ultra Pixels > Settings** to configure platforms.
+4. **Import GTM Container**: Upload `gtm-templates/ultra-pixels-gtm-container.json` to your GTM account.
 
 ## Quick Start
 
-- **GTM Container ID**: Insert your Google Tag Manager container ID for tag management.
-- **Meta/TikTok Pixel IDs**: Enable client-side pixel tracking for immediate event capture.
-- **CAPI Endpoint & Token**: Configure server-side event forwarding for reliable CAPI delivery.
-- **Event Mapping**: Customize how internal events map to platform-specific event names (e.g., `purchase` → Meta `Purchase`, TikTok `PlaceAnOrder`).
+### Option 1: GTM-First Setup (Recommended)
+1. **Import GTM Container**: GTM Admin → Import → `gtm-templates/ultra-pixels-gtm-container.json`
+2. **Configure Plugin Settings**:
+   - GTM Container ID: `GTM-XXXXXX`
+   - Enable GTM: Yes
+   - Meta Pixel ID: (your pixel ID)
+   - TikTok Pixel ID: (your pixel ID)
+3. **Update GTM Variables**: Set your pixel IDs in GTM variables
+4. **Test & Publish**: Use GTM Preview mode, then publish
+
+📚 **Full Guide**: See [GTM-SETUP-GUIDE.md](./GTM-SETUP-GUIDE.md) for detailed instructions
+
+### Option 2: Direct Pixel Setup
+- **GTM Container ID**: Your Google Tag Manager container ID
+- **Platform Pixel IDs**: Enable tracking for Meta, TikTok, Google Ads, Snapchat, Pinterest
+- **CAPI Endpoint & Token**: Configure server-side event forwarding
+- **Event Mapping**: Customize platform-specific event names (JSON format)
 
 ## Features
 
-### WooCommerce Integration
-- Auto-track: `view_item`, `add_to_cart`, `begin_checkout`, `purchase`
-- Events sent to CAPI queue immediately and processed asynchronously
-- Supports hashed customer data (email) for deduplication
+### 🎯 GTM & Multi-Platform Support
+- **Pre-built GTM Container**: Import and go - includes tags, triggers, variables for all platforms
+- **6+ Platforms**: Meta, TikTok, Google Ads, Snapchat, Pinterest + custom endpoints
+- **Enhanced Ecommerce**: GA4-compatible dataLayer with full transaction data
+- **Event Deduplication**: Consistent `event_id` across client and server
+- **Server-Side GTM**: Optional server container for enhanced privacy and performance
 
-### Landing Page Tracking
-- **WhatsApp Links**: Automatically detect and track WhatsApp interactions
-- **Custom Events**: Mark buttons/links with `data-up-event` and `data-up-payload` for custom event tracking
-- **Full Examples**: See [LANDING_PAGES.md](./LANDING_PAGES.md) for complete integration guide
+### 🛒 WooCommerce Integration
+- Auto-track: `PageView`, `view_item`, `add_to_cart`, `begin_checkout`, `purchase`
+- Enhanced Ecommerce data with product details, prices, quantities
+- Events sent to CAPI queue and processed asynchronously
+- Hashed customer data (email) for privacy and deduplication
+- Transaction-level revenue and currency tracking
+
+### 🎨 Elementor Integration
+- **Popup Tracking**: Automatic open/close events
+- **Form Submissions**: Track Elementor Pro forms with field data
+- **Button Clicks**: Track CTA buttons with custom attributes
+- **Tab/Accordion**: Track user interactions with content
+- **Widget Support**: Easy integration via data attributes
+
+### 📝 Smart Tracking Features
+- **Automatic Form Detection**: Track all form submissions (including search)
+- **Scroll Depth**: Monitor engagement at 25%, 50%, 75%, 90%
+- **WhatsApp Links**: Auto-detect and track WhatsApp interactions
+- **Custom Events**: Use `data-up-event` attributes on any element
+- **Dynamic Elements**: Works with AJAX-loaded content
+
+### 🌐 Landing Page Tracking
+- **WhatsApp Buttons**: Automatically detect and track WhatsApp clicks
+- **Custom Events**: Mark buttons/links with `data-up-event` and `data-up-payload`
+- **Works Everywhere**: Custom code, Elementor, page builders
+- **Full Examples**: See [LANDING_PAGES.md](./LANDING_PAGES.md) for integration guide
 
 ### Async CAPI Queue
 - **DB-backed**: Events stored in `{prefix}up_capi_queue` table (created on activation)
