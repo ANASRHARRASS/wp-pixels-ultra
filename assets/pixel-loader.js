@@ -167,6 +167,10 @@
 
             if (!eventName) return;
 
+            // Normalize whatsapp fields into custom_data namespace
+            if (payload.whatsapp_phone) {
+                payload.channel = 'whatsapp';
+            }
             var ev = {
                 event: 'up_event',
                 event_name: eventName,
@@ -194,24 +198,27 @@
         try {
             var form = e.target;
             if (!form || form.tagName !== 'FORM') return;
-            
+
             // Skip if form has data-up-no-track attribute
             if (form.getAttribute('data-up-no-track')) return;
-            
+
             // Get form details
             var formName = form.getAttribute('name') || form.getAttribute('id') || 'unnamed_form';
             var formAction = form.getAttribute('action') || window.location.href;
             var formMethod = form.getAttribute('method') || 'get';
-            
+
             // Check if it's a search form
             var isSearch = form.querySelector('input[type="search"], input[name="s"], input[name="search"]') !== null;
-            
+
             var eventName = isSearch ? 'search' : 'form_submit';
-            
+
+            // Deterministic form event id based on name+action+method for dedup across client/server (hash-like simple approach)
+            var hashSource = formName + '|' + formAction + '|' + formMethod;
+            var hash = 0; for (var i=0;i<hashSource.length;i++){ hash = ((hash<<5)-hash) + hashSource.charCodeAt(i); hash |= 0; }
             var formEvent = {
                 event: 'up_event',
                 event_name: eventName,
-                event_id: 'form_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+                event_id: 'form_' + Math.abs(hash),
                 event_time: Math.floor(Date.now() / 1000),
                 source_url: window.location.href,
                 custom_data: {
@@ -221,7 +228,7 @@
                     form_field_count: form.querySelectorAll('input, textarea, select').length
                 }
             };
-            
+
             // Add search query if it's a search form
             if (isSearch) {
                 var searchInput = form.querySelector('input[type="search"], input[name="s"], input[name="search"]');
@@ -229,53 +236,53 @@
                     formEvent.custom_data.search_term = searchInput.value;
                 }
             }
-            
+
             // Push to dataLayer
             window.dataLayer = window.dataLayer || [];
             window.dataLayer.push(formEvent);
-            
+
             // Send to server
             sendToServer(formEvent);
         } catch (err) {
             console.warn('UP form handler error', err);
         }
     }
-    
+
     // Listen for form submissions
     document.addEventListener('submit', handleFormSubmit, true);
-    
+
     // Scroll depth tracking (25%, 50%, 75%, 90%)
-    (function() {
+    (function () {
         var depths = [25, 50, 75, 90];
         var tracked = {};
-        
+
         function checkScrollDepth() {
             var scrolled = (window.scrollY / (document.body.scrollHeight - window.innerHeight)) * 100;
-            
-            depths.forEach(function(depth) {
+
+            depths.forEach(function (depth) {
                 if (scrolled >= depth && !tracked[depth]) {
                     tracked[depth] = true;
-                    
+
                     var scrollEvent = {
                         event: 'up_event',
                         event_name: 'scroll_depth',
-                        event_id: 'scroll_' + depth + '_' + Date.now(),
+                        event_id: 'scroll_' + depth, // deterministic per depth per page
                         event_time: Math.floor(Date.now() / 1000),
                         source_url: window.location.href,
                         custom_data: {
                             depth: depth + '%'
                         }
                     };
-                    
+
                     window.dataLayer = window.dataLayer || [];
                     window.dataLayer.push(scrollEvent);
                 }
             });
         }
-        
+
         // Throttle scroll events
         var scrollTimeout;
-        window.addEventListener('scroll', function() {
+        window.addEventListener('scroll', function () {
             if (scrollTimeout) clearTimeout(scrollTimeout);
             scrollTimeout = setTimeout(checkScrollDepth, 200);
         });

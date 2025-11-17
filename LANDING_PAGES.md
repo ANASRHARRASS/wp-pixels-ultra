@@ -6,9 +6,10 @@ This guide explains how to track WhatsApp interactions and custom events on your
 
 The Ultra Pixels plugin automatically injects a tracking pixel loader (`assets/pixel-loader.js`) on every page. This script:
 - Sends a `PageView` event to your ingest endpoint
-- Tracks clicks on WhatsApp links and custom elements
-- Pushes events to Google Tag Manager (if configured)
-- Forwards events to Meta and TikTok via your configured CAPI endpoint
+- Tracks clicks on WhatsApp links, forms, scroll depth, and custom elements
+- Pushes unified `up_event` entries into the dataLayer (GTM-friendly)
+- Forwards events to Meta, TikTok (and optionally Google Ads, Snapchat, Pinterest) via server-side queue/CAPI (if enabled)
+- Can let GTM manage all client pixels (set **Let GTM manage all client pixels = Yes**)
 
 ## Tracking WhatsApp Interactions
 
@@ -83,10 +84,11 @@ Use `data-up-event` on any clickable element to send custom events:
 
 ## Event Data Structure
 
-Each event sent to the ingest endpoint has this structure:
+Each event sent to the ingest endpoint (and pushed to `dataLayer`) uses the unified schema:
 
 ```json
 {
+  "event": "up_event",
   "event_name": "whatsapp_initiate",
   "event_id": "ev_1699900000000_abc123xyz",
   "event_time": 1699900000,
@@ -99,11 +101,12 @@ Each event sent to the ingest endpoint has this structure:
 }
 ```
 
-- **event_name**: The event type (from `data-up-event` or auto-detected)
-- **event_id**: Unique identifier per event (auto-generated, useful for deduplication)
-- **event_time**: Unix timestamp in seconds
-- **user_data**: Hashed user info (email, phone, etc.) — empty by default on client
-- **custom_data**: Extra fields from `data-up-payload` and auto-detected data
+- **event**: Always `up_event` for GTM Custom Event Trigger
+- **event_name**: The business event type (from `data-up-event` or auto-detected)
+- **event_id**: Unique identifier; deterministic for purchases (`order_<id>`) & forms (`form_<hash>`)
+- **event_time**: Unix timestamp (seconds)
+- **user_data**: Hashed user info (empty client-side; enriched server-side)
+- **custom_data**: Extra fields from `data-up-payload` and auto-detected data (WhatsApp phone/text, form metadata, scroll depth)
 
 ## Real-World Examples
 

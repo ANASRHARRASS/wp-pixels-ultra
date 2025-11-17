@@ -207,6 +207,12 @@ class UP_CAPI {
 		$meta_id = UP_Settings::get( 'meta_pixel_id', '' );
 		$enable_tiktok = UP_Settings::get( 'enable_tiktok', 'no' ) === 'yes';
 		$tiktok_id = UP_Settings::get( 'tiktok_pixel_id', '' );
+		$enable_google_ads = UP_Settings::get( 'enable_google_ads', 'no' ) === 'yes';
+		$google_ads_id = UP_Settings::get( 'google_ads_id', '' );
+		$enable_snapchat = UP_Settings::get( 'enable_snapchat', 'no' ) === 'yes';
+		snapchat_id = UP_Settings::get( 'snapchat_pixel_id', '' );
+		$enable_pinterest = UP_Settings::get( 'enable_pinterest', 'no' ) === 'yes';
+		$pinterest_id = UP_Settings::get( 'pinterest_tag_id', '' );
 		$token = UP_Settings::get( 'capi_token', '' );
 
 		try {
@@ -215,6 +221,15 @@ class UP_CAPI {
 			}
 			if ( $platform === 'tiktok' || ( $enable_tiktok && $tiktok_id && $platform === 'generic' ) ) {
 				return self::send_to_tiktok( $tiktok_id, $token, array( array_merge( array( 'event_name' => $event_name ), $payload ) ), $blocking );
+			}
+			if ( $platform === 'google_ads' || ( $enable_google_ads && $google_ads_id && $platform === 'generic' ) ) {
+				return self::send_to_google_ads( $google_ads_id, $token, array( array_merge( array( 'event_name' => $event_name ), $payload ) ), $blocking );
+			}
+			if ( $platform === 'snapchat' || ( $enable_snapchat && $snapchat_id && $platform === 'generic' ) ) {
+				return self::send_to_snapchat( $snapchat_id, $token, array( array_merge( array( 'event_name' => $event_name ), $payload ) ), $blocking );
+			}
+			if ( $platform === 'pinterest' || ( $enable_pinterest && $pinterest_id && $platform === 'generic' ) ) {
+				return self::send_to_pinterest( $pinterest_id, $token, array( array_merge( array( 'event_name' => $event_name ), $payload ) ), $blocking );
 			}
 			// Fallback: forward to configured generic CAPI endpoint
 			$endpoint = UP_Settings::get( 'capi_endpoint', '' );

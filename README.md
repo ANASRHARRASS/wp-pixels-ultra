@@ -100,9 +100,19 @@ A production-ready WordPress plugin for **GTM-first tracking** with comprehensiv
 - **Event Mapping Preview**: Real-time JSON validation and event summary
 - **Landing Page Guides**: Built-in examples for WhatsApp and custom event tracking
 
+## GTM Management Mode
+
+When you set **Let GTM manage all client pixels = Yes** in settings:
+- Plugin stops injecting Meta / TikTok / Snapchat / Pinterest base code (and any future ones).
+- Only the lightweight `up_event` dataLayer pushes and server-side queue remain active.
+- Import your GTM container or configure platform templates manually (see `GTM_SETUP.md`).
+- Deduplication: Purchase keeps deterministic `event_id` (`order_<id>`); other events random/hashed.
+
+Fallback: Set the flag to **No** to have the plugin inject minimal base pixels if you are not ready with GTM yet.
+
 ## Configuration
 
-### Event Mapping
+### Event Mapping & Multi-Platform
 
 Default mappings are provided for common events:
 
@@ -125,7 +135,7 @@ Default mappings are provided for common events:
 
 Edit the **Event Mapping (JSON)** field in admin settings to customize platform-specific event names.
 
-### Server-side Setup
+### Server-side Setup & Queue
 
 Set in `wp-config.php` for enhanced security:
 
@@ -155,6 +165,10 @@ Or configure via admin panel (Settings > CAPI Endpoint/Token).
 ```
 
 See [LANDING_PAGES.md](./LANDING_PAGES.md) for more examples.
+
+### Data Layer Schema (Summary)
+
+All pushes: `event:'up_event'`, `event_name`, `event_id`, `value`, `currency`, `contents[]`, `transaction_id`, `source_url`, optional `ecommerce.items` array for GA4.
 
 ### PHP Event Registration
 
