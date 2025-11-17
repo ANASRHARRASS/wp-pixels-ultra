@@ -1,0 +1,108 @@
+.wrap .form-table textarea#event_mapping {
+  font-family: monospace;
+  font-size: 13px;
+  line-height: 1.4;
+  min-height: 220px;
+  width: 100%;
+}
+
+.wrap .description code {
+  display: block;
+  white-space: pre;
+  background: #f8f8f8;
+  padding: 8px;
+  border-radius: 3px;
+}
+
+/* Ultra Pixels admin dashboard styles */
+.up-admin-queue-dashboard {
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  box-shadow: 0 6px 24px rgba(2, 6, 23, 0.6);
+}
+
+.up-admin-queue-dashboard h2 {
+  font-weight: 600;
+  color: #e6eef6;
+}
+
+.up-admin-queue-dashboard .button {
+  background: #0ea5a0;
+  border-color: #0ea5a0;
+  color: #072023;
+}
+
+.up-admin-queue-dashboard .button:hover {
+  background: #08a29f;
+}
+
+.up-admin-queue-dashboard table.widefat {
+  width: 100%;
+  border-collapse: collapse;
+  color: #dbeafe;
+}
+
+.up-admin-queue-dashboard table.widefat thead th {
+  background: linear-gradient(180deg, #061826, #0b2430);
+  color: #9fb0c8;
+  padding: 8px;
+  text-align: left;
+}
+
+.up-admin-queue-dashboard table.widefat tbody td {
+  background: #071022;
+  padding: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.02);
+  vertical-align: top;
+}
+
+.up-admin-queue-dashboard pre {
+  background: #fff;
+  color: #111;
+  border-radius: 4px;
+  padding: 6px;
+}
+
+.up-admin-queue-dashboard .error {
+  color: #f87171;
+}
+
+.up-admin-queue-dashboard #up-deadletter-section h3 {
+  margin: 0 0 8px;
+}
+
+/* Logs */
+.up-admin-queue-dashboard #up-error-entries ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.up-admin-queue-dashboard #up-error-entries li {
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+  font-family: monospace;
+  font-size: 13px;
+}
+
+/* Accessibility focus states */
+.up-admin-queue-dashboard a:focus,
+.up-admin-queue-dashboard button:focus {
+  outline: 3px solid rgba(14, 165, 160, 0.18);
+  outline-offset: 2px;
+}
+
+/* Responsive tweaks */
+@media (max-width:720px) {
+  .up-admin-queue-dashboard {
+    padding: 16px;
+  }
+
+  .up-admin-queue-dashboard table.widefat thead {
+    display: none;
+  }
+
+  .up-admin-queue-dashboard table.widefat tbody td {
+    display: block;
+    width: 100%;
+  }
+}

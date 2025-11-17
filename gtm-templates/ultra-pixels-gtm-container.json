@@ -1,0 +1,593 @@
+{
+  "exportFormatVersion": 2,
+  "exportTime": "2025-11-15 16:58:00",
+  "containerVersion": {
+    "path": "accounts/XXXXXX/containers/XXXXXX/versions/0",
+    "accountId": "XXXXXX",
+    "containerId": "XXXXXX",
+    "containerVersionId": "0",
+    "name": "Ultra Pixels - Complete Setup",
+    "description": "Complete GTM setup for Ultra Pixels plugin with Meta, TikTok, and Google Ads integration. Import this container and configure your pixel IDs in variables.",
+    "container": {
+      "path": "accounts/XXXXXX/containers/XXXXXX",
+      "accountId": "XXXXXX",
+      "containerId": "XXXXXX",
+      "name": "Ultra Pixels Tracking",
+      "publicId": "GTM-XXXXXX",
+      "usageContext": [
+        "WEB"
+      ]
+    },
+    "tag": [
+      {
+        "accountId": "XXXXXX",
+        "containerId": "XXXXXX",
+        "tagId": "1",
+        "name": "Meta Pixel - PageView",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<script>\n  if (window.fbq) {\n    fbq('track', 'PageView', {}, {\n      eventID: {{DLV - Event ID}}\n    });\n  }\n</script>"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "supportDocumentWrite",
+            "value": "false"
+          }
+        ],
+        "fingerprint": "1",
+        "firingTriggerId": [
+          "1"
+        ],
+        "tagFiringOption": "ONCE_PER_EVENT",
+        "monitoringMetadata": {
+          "type": "MAP"
+        }
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "XXXXXX",
+        "tagId": "2",
+        "name": "Meta Pixel - Dynamic Events",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<script>\n  if (window.fbq && {{DLV - Event Name}}) {\n    var eventData = {\n      content_ids: {{DLV - Content IDs}} || [],\n      content_type: 'product',\n      value: {{DLV - Value}} || 0,\n      currency: {{DLV - Currency}} || 'USD'\n    };\n    \n    // Add custom data from dataLayer\n    if ({{DLV - Custom Data}}) {\n      Object.assign(eventData, {{DLV - Custom Data}});\n    }\n    \n    fbq('track', {{DLV - Event Name}}, eventData, {\n      eventID: {{DLV - Event ID}}\n    });\n  }\n</script>"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "supportDocumentWrite",
+            "value": "false"
+          }
+        ],
+        "fingerprint": "2",
+        "firingTriggerId": [
+          "2"
+        ],
+        "tagFiringOption": "UNLIMITED",
+        "monitoringMetadata": {
+          "type": "MAP"
+        }
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "XXXXXX",
+        "tagId": "3",
+        "name": "TikTok Pixel - PageView",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<script>\n  if (window.ttq) {\n    ttq.track('PageView', {\n      event_id: {{DLV - Event ID}}\n    });\n  }\n</script>"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "supportDocumentWrite",
+            "value": "false"
+          }
+        ],
+        "fingerprint": "3",
+        "firingTriggerId": [
+          "1"
+        ],
+        "tagFiringOption": "ONCE_PER_EVENT",
+        "monitoringMetadata": {
+          "type": "MAP"
+        }
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "XXXXXX",
+        "tagId": "4",
+        "name": "TikTok Pixel - Dynamic Events",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<script>\n  if (window.ttq && {{DLV - TikTok Event Name}}) {\n    var eventData = {\n      content_ids: {{DLV - Content IDs}} || [],\n      content_type: 'product',\n      value: {{DLV - Value}} || 0,\n      currency: {{DLV - Currency}} || 'USD',\n      event_id: {{DLV - Event ID}}\n    };\n    \n    // Add custom data\n    if ({{DLV - Custom Data}}) {\n      Object.assign(eventData, {{DLV - Custom Data}});\n    }\n    \n    ttq.track({{DLV - TikTok Event Name}}, eventData);\n  }\n</script>"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "supportDocumentWrite",
+            "value": "false"
+          }
+        ],
+        "fingerprint": "4",
+        "firingTriggerId": [
+          "2"
+        ],
+        "tagFiringOption": "UNLIMITED",
+        "monitoringMetadata": {
+          "type": "MAP"
+        }
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "XXXXXX",
+        "tagId": "5",
+        "name": "Server-Side Event Forward",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<script>\n  (function() {\n    // This tag forwards events to server-side GTM or WordPress CAPI endpoint\n    var eventData = {\n      event_name: {{DLV - Event Name}},\n      event_id: {{DLV - Event ID}},\n      event_time: {{DLV - Event Time}},\n      source_url: {{Page URL}},\n      user_data: {{DLV - User Data}} || {},\n      custom_data: {{DLV - Custom Data}} || {}\n    };\n    \n    // Send to server endpoint (configured in plugin)\n    if (window.UP_CONFIG && window.UP_CONFIG.ingest_url) {\n      fetch(window.UP_CONFIG.ingest_url, {\n        method: 'POST',\n        headers: {\n          'Content-Type': 'application/json',\n          'X-WP-Nonce': window.UP_CONFIG.nonce || ''\n        },\n        body: JSON.stringify(eventData),\n        keepalive: true\n      }).catch(function(e) {\n        console.warn('UP server forward failed', e);\n      });\n    }\n  })();\n</script>"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "supportDocumentWrite",
+            "value": "false"
+          }
+        ],
+        "fingerprint": "5",
+        "firingTriggerId": [
+          "2"
+        ],
+        "tagFiringOption": "UNLIMITED",
+        "monitoringMetadata": {
+          "type": "MAP"
+        }
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "XXXXXX",
+        "tagId": "6",
+        "name": "GA4 - Enhanced Ecommerce",
+        "type": "gaawe",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "eventName",
+            "value": "{{DLV - GA4 Event Name}}"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "sendEcommerceData",
+            "value": "true"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "measurementId",
+            "value": "{{GA4 Measurement ID}}"
+          }
+        ],
+        "fingerprint": "6",
+        "firingTriggerId": [
+          "2"
+        ],
+        "tagFiringOption": "UNLIMITED",
+        "monitoringMetadata": {
+          "type": "MAP"
+        }
+      }
+    ],
+    "trigger": [
+      {
+        "accountId": "XXXXXX",
+        "containerId": "XXXXXX",
+        "triggerId": "1",
+        "name": "All Pages - PageView",
+        "type": "PAGE_VIEW",
+        "filter": []
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "XXXXXX",
+        "triggerId": "2",
+        "name": "Ultra Pixels Custom Event",
+        "type": "CUSTOM_EVENT",
+        "customEventFilter": [
+          {
+            "type": "EQUALS",
+            "parameter": [
+              {
+                "type": "TEMPLATE",
+                "key": "arg0",
+                "value": "{{_event}}"
+              },
+              {
+                "type": "TEMPLATE",
+                "key": "arg1",
+                "value": "up_event"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "XXXXXX",
+        "triggerId": "3",
+        "name": "Purchase Event",
+        "type": "CUSTOM_EVENT",
+        "customEventFilter": [
+          {
+            "type": "EQUALS",
+            "parameter": [
+              {
+                "type": "TEMPLATE",
+                "key": "arg0",
+                "value": "{{DLV - Event Name}}"
+              },
+              {
+                "type": "TEMPLATE",
+                "key": "arg1",
+                "value": "purchase"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "XXXXXX",
+        "triggerId": "4",
+        "name": "Form Submission",
+        "type": "FORM_SUBMISSION",
+        "filter": []
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "XXXXXX",
+        "triggerId": "5",
+        "name": "WhatsApp Click",
+        "type": "CUSTOM_EVENT",
+        "customEventFilter": [
+          {
+            "type": "MATCH_REGEX",
+            "parameter": [
+              {
+                "type": "TEMPLATE",
+                "key": "arg0",
+                "value": "{{DLV - Event Name}}"
+              },
+              {
+                "type": "TEMPLATE",
+                "key": "arg1",
+                "value": "whatsapp_(initiate|click)"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "variable": [
+      {
+        "accountId": "XXXXXX",
+        "containerId": "XXXXXX",
+        "variableId": "1",
+        "name": "DLV - Event Name",
+        "type": "v",
+        "parameter": [
+          {
+            "type": "INTEGER",
+            "key": "dataLayerVersion",
+            "value": "2"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "setDefaultValue",
+            "value": "false"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "name",
+            "value": "event_name"
+          }
+        ]
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "XXXXXX",
+        "variableId": "2",
+        "name": "DLV - Event ID",
+        "type": "v",
+        "parameter": [
+          {
+            "type": "INTEGER",
+            "key": "dataLayerVersion",
+            "value": "2"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "setDefaultValue",
+            "value": "false"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "name",
+            "value": "event_id"
+          }
+        ]
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "XXXXXX",
+        "variableId": "3",
+        "name": "DLV - Value",
+        "type": "v",
+        "parameter": [
+          {
+            "type": "INTEGER",
+            "key": "dataLayerVersion",
+            "value": "2"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "setDefaultValue",
+            "value": "true"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "name",
+            "value": "custom_data.value"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "defaultValue",
+            "value": "0"
+          }
+        ]
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "XXXXXX",
+        "variableId": "4",
+        "name": "DLV - Currency",
+        "type": "v",
+        "parameter": [
+          {
+            "type": "INTEGER",
+            "key": "dataLayerVersion",
+            "value": "2"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "setDefaultValue",
+            "value": "true"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "name",
+            "value": "custom_data.currency"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "defaultValue",
+            "value": "USD"
+          }
+        ]
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "XXXXXX",
+        "variableId": "5",
+        "name": "DLV - Content IDs",
+        "type": "v",
+        "parameter": [
+          {
+            "type": "INTEGER",
+            "key": "dataLayerVersion",
+            "value": "2"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "setDefaultValue",
+            "value": "true"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "name",
+            "value": "custom_data.content_ids"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "defaultValue",
+            "value": "[]"
+          }
+        ]
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "XXXXXX",
+        "variableId": "6",
+        "name": "DLV - Custom Data",
+        "type": "v",
+        "parameter": [
+          {
+            "type": "INTEGER",
+            "key": "dataLayerVersion",
+            "value": "2"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "setDefaultValue",
+            "value": "false"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "name",
+            "value": "custom_data"
+          }
+        ]
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "XXXXXX",
+        "variableId": "7",
+        "name": "DLV - User Data",
+        "type": "v",
+        "parameter": [
+          {
+            "type": "INTEGER",
+            "key": "dataLayerVersion",
+            "value": "2"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "setDefaultValue",
+            "value": "false"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "name",
+            "value": "user_data"
+          }
+        ]
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "XXXXXX",
+        "variableId": "8",
+        "name": "DLV - Event Time",
+        "type": "v",
+        "parameter": [
+          {
+            "type": "INTEGER",
+            "key": "dataLayerVersion",
+            "value": "2"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "setDefaultValue",
+            "value": "false"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "name",
+            "value": "event_time"
+          }
+        ]
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "XXXXXX",
+        "variableId": "9",
+        "name": "DLV - TikTok Event Name",
+        "type": "jsm",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "javascript",
+            "value": "function() {\n  var eventMap = {\n    'purchase': 'PlaceAnOrder',\n    'add_to_cart': 'AddToCart',\n    'view_item': 'ViewContent',\n    'begin_checkout': 'InitiateCheckout',\n    'whatsapp_initiate': 'Contact',\n    'form_submit': 'SubmitForm',\n    'PageView': 'PageView'\n  };\n  var eventName = {{DLV - Event Name}};\n  return eventMap[eventName] || eventName;\n}"
+          }
+        ]
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "XXXXXX",
+        "variableId": "10",
+        "name": "DLV - GA4 Event Name",
+        "type": "jsm",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "javascript",
+            "value": "function() {\n  var eventMap = {\n    'purchase': 'purchase',\n    'add_to_cart': 'add_to_cart',\n    'view_item': 'view_item',\n    'begin_checkout': 'begin_checkout',\n    'view_item_list': 'view_item_list',\n    'PageView': 'page_view'\n  };\n  var eventName = {{DLV - Event Name}};\n  return eventMap[eventName] || eventName;\n}"
+          }
+        ]
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "XXXXXX",
+        "variableId": "11",
+        "name": "Meta Pixel ID",
+        "type": "c",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "value",
+            "value": "YOUR_META_PIXEL_ID"
+          }
+        ]
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "XXXXXX",
+        "variableId": "12",
+        "name": "TikTok Pixel ID",
+        "type": "c",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "value",
+            "value": "YOUR_TIKTOK_PIXEL_ID"
+          }
+        ]
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "XXXXXX",
+        "variableId": "13",
+        "name": "GA4 Measurement ID",
+        "type": "c",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "value",
+            "value": "G-XXXXXXXXXX"
+          }
+        ]
+      }
+    ],
+    "builtInVariable": [
+      {
+        "accountId": "XXXXXX",
+        "containerId": "XXXXXX",
+        "type": "PAGE_URL",
+        "name": "Page URL"
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "XXXXXX",
+        "type": "PAGE_HOSTNAME",
+        "name": "Page Hostname"
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "XXXXXX",
+        "type": "PAGE_PATH",
+        "name": "Page Path"
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "XXXXXX",
+        "type": "REFERRER",
+        "name": "Referrer"
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "XXXXXX",
+        "type": "EVENT",
+        "name": "Event"
+      }
+    ],
+    "fingerprint": "0"
+  }
+}
