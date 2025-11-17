@@ -67,8 +67,11 @@ class UP_Settings {
             'meta_pixel_id'     => '',
             'tiktok_pixel_id'   => '',
             'google_ads_id'     => '',
+            'google_ads_label'  => '',
             'snapchat_pixel_id' => '',
+            'snapchat_api_token'=> '',
             'pinterest_tag_id'  => '',
+            'pinterest_access_token' => '',
             'gtm_manage_pixels' => 'no',
             'enable_gtm'        => 'no',
             'enable_meta'       => 'no',
@@ -115,6 +118,11 @@ class UP_Settings {
                         break;
                     case 'capi_token':
                         // token-like values: sanitize_text_field then trim
+                        $out[ $key ] = sanitize_text_field( trim( $val ) );
+                        break;
+                    case 'google_ads_label':
+                    case 'snapchat_api_token':
+                    case 'pinterest_access_token':
                         $out[ $key ] = sanitize_text_field( trim( $val ) );
                         break;
                     case 'capi_endpoint':
@@ -226,6 +234,12 @@ class UP_Settings {
                         </td>
                     </tr>
                     <tr>
+                        <th scope="row"><label for="google_ads_label">Google Ads Conversion Label</label></th>
+                        <td><input name="up_settings[google_ads_label]" id="google_ads_label" type="text" value="<?php echo esc_attr( $opts['google_ads_label'] ); ?>" class="regular-text" />
+                        <p class="description">Optional: Conversion label for enhanced conversions / offline uploads.</p>
+                        </td>
+                    </tr>
+                    <tr>
                         <th scope="row"><label for="enable_google_ads">Enable Google Ads</label></th>
                         <td>
                             <select name="up_settings[enable_google_ads]" id="enable_google_ads">
@@ -239,6 +253,12 @@ class UP_Settings {
                         <td><input name="up_settings[snapchat_pixel_id]" id="snapchat_pixel_id" type="text" value="<?php echo esc_attr( $opts['snapchat_pixel_id'] ); ?>" class="regular-text" /></td>
                     </tr>
                     <tr>
+                        <th scope="row"><label for="snapchat_api_token">Snapchat API Token</label></th>
+                        <td><input name="up_settings[snapchat_api_token]" id="snapchat_api_token" type="text" value="<?php echo esc_attr( $opts['snapchat_api_token'] ); ?>" class="regular-text" />
+                        <p class="description">Bearer token for Snapchat Conversions API (do not expose publicly).</p>
+                        </td>
+                    </tr>
+                    <tr>
                         <th scope="row"><label for="enable_snapchat">Enable Snapchat</label></th>
                         <td>
                             <select name="up_settings[enable_snapchat]" id="enable_snapchat">
@@ -250,6 +270,12 @@ class UP_Settings {
                     <tr>
                         <th scope="row"><label for="pinterest_tag_id">Pinterest Tag ID</label></th>
                         <td><input name="up_settings[pinterest_tag_id]" id="pinterest_tag_id" type="text" value="<?php echo esc_attr( $opts['pinterest_tag_id'] ); ?>" class="regular-text" /></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="pinterest_access_token">Pinterest Access Token</label></th>
+                        <td><input name="up_settings[pinterest_access_token]" id="pinterest_access_token" type="text" value="<?php echo esc_attr( $opts['pinterest_access_token'] ); ?>" class="regular-text" />
+                        <p class="description">Access token for Pinterest Conversions API.</p>
+                        </td>
                     </tr>
                     <tr>
                         <th scope="row"><label for="enable_pinterest">Enable Pinterest</label></th>

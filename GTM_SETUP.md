@@ -94,7 +94,23 @@ Server-side queue sends Purchase with deterministic `event_id` (`order_<id>`). E
 Other events can remain with random or hashed IDs.
 
 ## 7. Consent Management
-Add Consent Initialization tag early. Gate platform tags by consent variables (e.g., `ad_storage = granted`). You can also create an extra condition on triggers requiring a DLV like `consent_granted` if you inject it yourself.
+Add Consent Initialization tag early. Gate platform tags by consent variables (e.g., `ad_storage = granted`). The plugin exposes gating via `window.UP_CONSENT` (set before loader):
+```html
+<script>
+window.UP_CONSENT = { ads: false, analytics: true }; // set ads true when user grants marketing
+</script>
+```
+If `ads` is false or region blocked (see section below) ad pixels won't inject; if `analytics` false events push to dataLayer but skip server forwarding.
+
+### Region Blocking
+Optionally define:
+```html
+<script>
+window.UP_REGION = 'de';
+window.UP_REGION_BLOCKED = ['de','at'];
+</script>
+```
+If current region is in the blocked list, ad pixels are suppressed and server sends disabled (privacy / compliance fallback).
 
 ## 8. Enhanced Ecommerce (GA4)
 Use GA4 Event tag for Purchase:
@@ -109,6 +125,7 @@ For simpler setups you can use a single Custom HTML tag fired on `up_event` to f
 - Use GTM Preview mode: verify each pushed event object and tag firing.
 - Browser extensions: Meta Pixel Helper, TikTok Pixel Helper, Pinterest Tag Helper.
 - Plugin Admin: Queue length, dead-letter, logs confirm server delivery.
+- Health Endpoint: `GET /wp-json/up/v1/health` quick JSON status for dashboards / probes.
 
 ## 11. Adding New Platforms
 1. Add enable + id fields in settings (mirroring existing ones).
@@ -123,6 +140,8 @@ For simpler setups you can use a single Custom HTML tag fired on `up_event` to f
 | Pixel fires but no server match | Platform disabled server-side | Enable platform in settings; verify ID present. |
 | Queue grows, no sends | Cron disabled | Trigger manual process in Admin or run `wp up-capi process`. |
 | Invalid JSON mapping | Syntax error in settings JSON | Fix JSON; see transient error notice. |
+| No ad pixels injected | Consent ads false / region blocked | Set `UP_CONSENT.ads` true or remove region from `UP_REGION_BLOCKED`. |
+| Server events missing under consent mode | analytics false | Grant analytics or remove blocking logic. |
 
 ## 13. Production Checklist
 - GTM manage flag set appropriately.
@@ -131,6 +150,7 @@ For simpler setups you can use a single Custom HTML tag fired on `up_event` to f
 - Server queue processing regularly (check last processed timestamp).
 - Dead-letter table empty or monitored.
 - Consent flows tested in all regions.
+- Health endpoint returns expected metrics.
 
 ---
 Use this guide as living documentation; update when adding platforms or changing event schema.

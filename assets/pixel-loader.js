@@ -1,6 +1,24 @@
 (function () {
     'use strict';
 
+    // Consent + region gating helpers (non-blocking defaults)
+    function getConsentState() {
+        var c = window.UP_CONSENT || {};
+        // expected possible keys: ads / marketing, analytics
+        return {
+            ads: c.ads === true || c.marketing === true || typeof c.ads === 'undefined' && typeof c.marketing === 'undefined',
+            analytics: c.analytics === true || typeof c.analytics === 'undefined'
+        };
+    }
+    function regionBlocked() {
+        var region = (window.UP_REGION || (typeof UP_CONFIG !== 'undefined' ? UP_CONFIG.region_code : '') || '').toString().toLowerCase();
+        var blocked = window.UP_REGION_BLOCKED || (typeof UP_CONFIG !== 'undefined' ? UP_CONFIG.region_blocked : []) || [];
+        if (!Array.isArray(blocked)) return false;
+        return blocked.map(function (r) { return (r || '').toString().toLowerCase(); }).indexOf(region) !== -1;
+    }
+    var CONSENT = getConsentState();
+    var REGION_BLOCKED = regionBlocked();
+
     function sendToServer(event) {
         if (typeof UP_CONFIG === 'undefined' || !UP_CONFIG.ingest_url) return;
         try {
@@ -49,8 +67,11 @@
 
     var GTM_MANAGES = (typeof UP_CONFIG !== 'undefined' && !!UP_CONFIG.gtm_manage_pixels);
 
-    // Inject Meta Pixel (minimal) if configured and not managed by GTM
-    if (!GTM_MANAGES && typeof UP_CONFIG !== 'undefined' && UP_CONFIG.meta_pixel_id) {
+    // Determine if advertising pixels allowed
+    var TRACK_ADS = CONSENT.ads && !REGION_BLOCKED;
+
+    // Inject Meta Pixel (minimal) if configured, allowed, and not managed by GTM
+    if (TRACK_ADS && !GTM_MANAGES && typeof UP_CONFIG !== 'undefined' && UP_CONFIG.meta_pixel_id) {
         (function (f, b, e, v, n, t, s) {
             if (f.fbq) return;
             n = f.fbq = function () { n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments); };
@@ -62,8 +83,8 @@
         try { window.fbq('init', UP_CONFIG.meta_pixel_id); window.fbq('track', 'PageView'); } catch (err) { /* ignore */ }
     }
 
-    // Inject TikTok Pixel (minimal) if configured and not managed by GTM
-    if (!GTM_MANAGES && typeof UP_CONFIG !== 'undefined' && UP_CONFIG.tiktok_pixel_id) {
+    // Inject TikTok Pixel (minimal) if configured, allowed, and not managed by GTM
+    if (TRACK_ADS && !GTM_MANAGES && typeof UP_CONFIG !== 'undefined' && UP_CONFIG.tiktok_pixel_id) {
         (function (w, d, t) {
             w.TiktokAnalyticsObject = t;
             var ttq = w[t] = w[t] || [];
@@ -82,8 +103,8 @@
         })(window, document, 'ttq');
     }
 
-    // Inject Snapchat Pixel if configured and not managed by GTM
-    if (!GTM_MANAGES && typeof UP_CONFIG !== 'undefined' && UP_CONFIG.snapchat_pixel_id) {
+    // Inject Snapchat Pixel if configured, allowed, and not managed by GTM
+    if (TRACK_ADS && !GTM_MANAGES && typeof UP_CONFIG !== 'undefined' && UP_CONFIG.snapchat_pixel_id) {
         (function (e, t, n) {
             if (e.snaptr) return;
             var a = e.snaptr = function () { a.handleRequest ? a.handleRequest.apply(a, arguments) : a.queue.push(arguments); };
@@ -97,8 +118,8 @@
         try { window.snaptr('init', UP_CONFIG.snapchat_pixel_id); window.snaptr('track', 'PAGE_VIEW'); } catch (err) { /* ignore */ }
     }
 
-    // Inject Pinterest Tag if configured and not managed by GTM
-    if (!GTM_MANAGES && typeof UP_CONFIG !== 'undefined' && UP_CONFIG.pinterest_tag_id) {
+    // Inject Pinterest Tag if configured, allowed, and not managed by GTM
+    if (TRACK_ADS && !GTM_MANAGES && typeof UP_CONFIG !== 'undefined' && UP_CONFIG.pinterest_tag_id) {
         (function (e) {
             if (!window.pintrk) {
                 window.pintrk = function () { window.pintrk.queue.push(Array.prototype.slice.call(arguments)); };
@@ -185,8 +206,10 @@
             window.dataLayer = window.dataLayer || [];
             window.dataLayer.push(ev);
 
-            // send to server ingest
-            sendToServer(ev);
+            // send to server only if analytics consent granted
+            if (CONSENT.analytics && !REGION_BLOCKED) {
+                sendToServer(ev);
+            }
         } catch (err) { console.warn('UP click handler error', err); }
     }
 
@@ -214,7 +237,7 @@
 
             // Deterministic form event id based on name+action+method for dedup across client/server (hash-like simple approach)
             var hashSource = formName + '|' + formAction + '|' + formMethod;
-            var hash = 0; for (var i=0;i<hashSource.length;i++){ hash = ((hash<<5)-hash) + hashSource.charCodeAt(i); hash |= 0; }
+            var hash = 0; for (var i = 0; i < hashSource.length; i++) { hash = ((hash << 5) - hash) + hashSource.charCodeAt(i); hash |= 0; }
             var formEvent = {
                 event: 'up_event',
                 event_name: eventName,
@@ -240,9 +263,9 @@
             // Push to dataLayer
             window.dataLayer = window.dataLayer || [];
             window.dataLayer.push(formEvent);
-
-            // Send to server
-            sendToServer(formEvent);
+            if (CONSENT.analytics && !REGION_BLOCKED) {
+                sendToServer(formEvent);
+            }
         } catch (err) {
             console.warn('UP form handler error', err);
         }
@@ -276,6 +299,9 @@
 
                     window.dataLayer = window.dataLayer || [];
                     window.dataLayer.push(scrollEvent);
+                    if (CONSENT.analytics && !REGION_BLOCKED) {
+                        sendToServer(scrollEvent);
+                    }
                 }
             });
         }

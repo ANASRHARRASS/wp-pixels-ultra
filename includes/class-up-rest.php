@@ -77,6 +77,13 @@ class UP_REST {
             'callback' => array( __CLASS__, 'queue_delete' ),
             'permission_callback' => function() { return current_user_can( 'manage_options' ); },
         ) );
+
+        // public health/diagnostics (non-sensitive) — safe for uptime checks
+        register_rest_route( 'up/v1', '/health', array(
+            'methods' => 'GET',
+            'callback' => array( __CLASS__, 'health' ),
+            'permission_callback' => '__return_true',
+        ) );
     }
 
     public static function ingest( WP_REST_Request $request ) {
@@ -298,6 +305,48 @@ class UP_REST {
         if ( ! class_exists( 'UP_CAPI' ) ) return new WP_REST_Response( array( 'error' => 'no_capi' ), 500 );
         $ok = UP_CAPI::delete_item( $id );
         return new WP_REST_Response( array( 'ok' => (bool) $ok ), 200 );
+    }
+
+    /**
+     * Lightweight health / readiness probe.
+     * Returns queue & dead-letter counts, last processed timestamp, enabled platform flags, recent log snippet.
+     * No sensitive tokens are exposed.
+     */
+    public static function health( WP_REST_Request $request ) {
+        $queue_len = 0;
+        $deadletter_len = 0;
+        $last_processed = get_option( 'up_capi_last_processed', 0 );
+        if ( class_exists( 'UP_CAPI' ) ) {
+            $queue_len = UP_CAPI::get_queue_length();
+            global $wpdb; $dl_table = $wpdb->prefix . 'up_capi_deadletter';
+            if ( $wpdb->get_var( "SHOW TABLES LIKE '{$dl_table}'" ) === $dl_table ) {
+                $deadletter_len = intval( $wpdb->get_var( "SELECT COUNT(1) FROM {$dl_table}" ) );
+            }
+        }
+        $platforms = array();
+        if ( class_exists( 'UP_Settings' ) ) {
+            $platforms = array(
+                'meta' => UP_Settings::get( 'enable_meta', 'no' ) === 'yes',
+                'tiktok' => UP_Settings::get( 'enable_tiktok', 'no' ) === 'yes',
+                'google_ads' => UP_Settings::get( 'enable_google_ads', 'no' ) === 'yes',
+                'snapchat' => UP_Settings::get( 'enable_snapchat', 'no' ) === 'yes',
+                'pinterest' => UP_Settings::get( 'enable_pinterest', 'no' ) === 'yes',
+            );
+        }
+        $logs = array();
+        if ( class_exists( 'UP_CAPI' ) && method_exists( 'UP_CAPI', 'get_logs' ) ) {
+            $all = UP_CAPI::get_logs();
+            $logs = array_slice( $all, 0, 10 ); // recent 10
+        }
+        return new WP_REST_Response( array(
+            'ok' => true,
+            'queue_length' => $queue_len,
+            'deadletter_length' => $deadletter_len,
+            'last_processed' => $last_processed,
+            'platforms' => $platforms,
+            'logs' => $logs,
+            'timestamp' => time(),
+        ), 200 );
     }
 
     // Simple admin renderer for queue dashboard (can be expanded into full SPA)

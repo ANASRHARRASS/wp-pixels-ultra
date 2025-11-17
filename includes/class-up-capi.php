@@ -210,10 +210,12 @@ class UP_CAPI {
 		$enable_google_ads = UP_Settings::get( 'enable_google_ads', 'no' ) === 'yes';
 		$google_ads_id = UP_Settings::get( 'google_ads_id', '' );
 		$enable_snapchat = UP_Settings::get( 'enable_snapchat', 'no' ) === 'yes';
-		snapchat_id = UP_Settings::get( 'snapchat_pixel_id', '' );
+		$snapchat_id = UP_Settings::get( 'snapchat_pixel_id', '' );
 		$enable_pinterest = UP_Settings::get( 'enable_pinterest', 'no' ) === 'yes';
 		$pinterest_id = UP_Settings::get( 'pinterest_tag_id', '' );
 		$token = UP_Settings::get( 'capi_token', '' );
+		$snapchat_token = UP_Settings::get( 'snapchat_api_token', '' );
+		$pinterest_token = UP_Settings::get( 'pinterest_access_token', '' );
 
 		try {
 			if ( $platform === 'meta' || ( $enable_meta && $meta_id && $platform === 'generic' ) ) {
@@ -226,10 +228,10 @@ class UP_CAPI {
 				return self::send_to_google_ads( $google_ads_id, $token, array( array_merge( array( 'event_name' => $event_name ), $payload ) ), $blocking );
 			}
 			if ( $platform === 'snapchat' || ( $enable_snapchat && $snapchat_id && $platform === 'generic' ) ) {
-				return self::send_to_snapchat( $snapchat_id, $token, array( array_merge( array( 'event_name' => $event_name ), $payload ) ), $blocking );
+				return self::send_to_snapchat( $snapchat_id, $snapchat_token, array( array_merge( array( 'event_name' => $event_name ), $payload ) ), $blocking );
 			}
 			if ( $platform === 'pinterest' || ( $enable_pinterest && $pinterest_id && $platform === 'generic' ) ) {
-				return self::send_to_pinterest( $pinterest_id, $token, array( array_merge( array( 'event_name' => $event_name ), $payload ) ), $blocking );
+				return self::send_to_pinterest( $pinterest_id, $pinterest_token, array( array_merge( array( 'event_name' => $event_name ), $payload ) ), $blocking );
 			}
 			// Fallback: forward to configured generic CAPI endpoint
 			$endpoint = UP_Settings::get( 'capi_endpoint', '' );
@@ -273,6 +275,8 @@ class UP_CAPI {
 		$google_ads_id = UP_Settings::get( 'google_ads_id', '' );
 		$snapchat_id = UP_Settings::get( 'snapchat_pixel_id', '' );
 		$pinterest_id = UP_Settings::get( 'pinterest_tag_id', '' );
+		$snapchat_token = UP_Settings::get( 'snapchat_api_token', '' );
+		$pinterest_token = UP_Settings::get( 'pinterest_access_token', '' );
 		
 		if ( $platform === 'meta' && $meta_id ) {
 			return self::send_to_meta( $meta_id, $token, $events, true );
@@ -284,10 +288,10 @@ class UP_CAPI {
 			return self::send_to_google_ads( $google_ads_id, $token, $events, true );
 		}
 		if ( $platform === 'snapchat' && $snapchat_id ) {
-			return self::send_to_snapchat( $snapchat_id, $token, $events, true );
+			return self::send_to_snapchat( $snapchat_id, $snapchat_token, $events, true );
 		}
 		if ( $platform === 'pinterest' && $pinterest_id ) {
-			return self::send_to_pinterest( $pinterest_id, $token, $events, true );
+			return self::send_to_pinterest( $pinterest_id, $pinterest_token, $events, true );
 		}
 		// fallback: send each event to generic endpoint individually
 		$last = null;
@@ -400,16 +404,59 @@ class UP_CAPI {
 	 * Send events to Google Ads Conversion API (Enhanced Conversions)
 	 */
 	protected static function send_to_google_ads( $conversion_id, $access_token, $events = array(), $blocking = true ) {
-		// Note: Google Ads requires OAuth2 authentication and proper conversion action setup
-		// This is a placeholder for custom implementation - typically requires server-side OAuth
-		// For production, use Google Ads API client library or gtag.js with enhanced conversions
-		$url = 'https://www.googleadservices.com/pagead/conversion/' . rawurlencode( $conversion_id ) . '/';
-		
-		// Log that Google Ads events are queued but need proper API setup
-		self::log( 'info', 'Google Ads events queued - configure enhanced conversions via GTM or Google Ads API' );
-		
-		// Return success for now - actual implementation requires Google Ads API setup
-		return array( 'response' => array( 'code' => 200 ) );
+		// Minimal server-side Enhanced Conversions style forwarding.
+		// Real offline / click conversion uploads require OAuth2 (developer token + customer ID + conversion action)
+		// which is intentionally not implemented here to avoid complexity. Instead we expose a generic payload
+		// that can be consumed by a GTM server container or custom middleware.
+		$label = UP_Settings::get( 'google_ads_label', '' );
+		$server_container = UP_Settings::get( 'gtm_server_url', '' );
+		if ( empty( $server_container ) ) {
+			self::log( 'warn', 'Google Ads send skipped: gtm_server_url not configured' );
+			return new WP_Error( 'google_ads_not_configured', 'GTM server URL required for Google Ads forwarding.' );
+		}
+		$endpoint = trailingslashit( $server_container ) . 'up-google-ads'; // custom path expected by integrator
+		$payloads = array();
+		foreach ( $events as $e ) {
+			$ec = array(
+				'conversion_id' => $conversion_id,
+				'conversion_label' => $label,
+				'event_time' => isset( $e['event_time'] ) ? intval( $e['event_time'] ) : time(),
+				'event_id' => isset( $e['event_id'] ) ? $e['event_id'] : uniqid( 'gad_', true ),
+				'event_name' => isset( $e['event_name'] ) ? $e['event_name'] : ( isset( $e['event'] ) ? $e['event'] : 'conversion' ),
+				'value' => isset( $e['custom_data']['value'] ) ? floatval( $e['custom_data']['value'] ) : null,
+				'currency' => isset( $e['custom_data']['currency'] ) ? $e['custom_data']['currency'] : null,
+				'source_url' => isset( $e['source_url'] ) ? esc_url_raw( $e['source_url'] ) : null,
+				'user_data' => array(),
+			);
+			if ( isset( $e['user_data'] ) && is_array( $e['user_data'] ) ) {
+				foreach ( $e['user_data'] as $k => $v ) {
+					if ( in_array( $k, array( 'email_hash','phone_hash' ), true ) ) {
+						$ec['user_data'][ $k ] = $v; // already hashed
+					}
+				}
+			}
+			$payloads[] = $ec;
+		}
+		$body = array( 'google_ads_conversions' => $payloads );
+		$args = array(
+			'timeout' => 15,
+			'headers' => array( 'Content-Type' => 'application/json', 'Accept' => 'application/json' ),
+			'body' => wp_json_encode( $body ),
+			'blocking' => (bool) $blocking,
+		);
+		if ( ! empty( $access_token ) ) {
+			$args['headers']['Authorization'] = 'Bearer ' . $access_token; // optional generic token if middleware wants it
+		}
+		$response = wp_remote_post( $endpoint, $args );
+		if ( is_wp_error( $response ) ) {
+			self::log( 'error', 'Google Ads forward error: ' . $response->get_error_message() );
+		} else {
+			$code = isset( $response['response']['code'] ) ? intval( $response['response']['code'] ) : 0;
+			if ( $code < 200 || $code >= 300 ) {
+				self::log( 'error', 'Google Ads forward HTTP ' . $code );
+			}
+		}
+		return $response;
 	}
 
 	/**
@@ -417,59 +464,42 @@ class UP_CAPI {
 	 */
 	protected static function send_to_snapchat( $pixel_id, $access_token, $events = array(), $blocking = true ) {
 		$url = 'https://tr.snapchat.com/v2/conversion';
-		$body = array(
-			'pixel_id' => $pixel_id,
-			'event' => array(),
-		);
-		
+		$body = array( 'batch' => array() ); // batch key supports multiple events
 		foreach ( $events as $e ) {
 			$item = array(
+				'pixel_id' => $pixel_id,
 				'event_name' => isset( $e['event_name'] ) ? strtoupper( $e['event_name'] ) : 'CUSTOM_EVENT_1',
 				'event_time' => isset( $e['event_time'] ) ? intval( $e['event_time'] ) : time(),
 				'event_id' => isset( $e['event_id'] ) ? $e['event_id'] : uniqid( 'snap_', true ),
+				'action_source' => 'website',
 			);
-			
-			// Add user data if available
+			if ( isset( $e['source_url'] ) ) {
+				$item['event_source_url'] = esc_url_raw( $e['source_url'] );
+			}
+			// User data (hashed)
 			if ( isset( $e['user_data'] ) && is_array( $e['user_data'] ) ) {
 				$item['user'] = array();
-				if ( isset( $e['user_data']['email_hash'] ) ) {
-					$item['user']['em'] = $e['user_data']['email_hash'];
-				}
-				if ( isset( $e['user_data']['phone_hash'] ) ) {
-					$item['user']['ph'] = $e['user_data']['phone_hash'];
-				}
+				if ( isset( $e['user_data']['email_hash'] ) ) $item['user']['em'] = $e['user_data']['email_hash'];
+				if ( isset( $e['user_data']['phone_hash'] ) ) $item['user']['ph'] = $e['user_data']['phone_hash'];
 			}
-			
-			// Add custom data
+			// Custom data
 			if ( isset( $e['custom_data'] ) && is_array( $e['custom_data'] ) ) {
-				if ( isset( $e['custom_data']['value'] ) ) {
-					$item['price'] = floatval( $e['custom_data']['value'] );
-				}
-				if ( isset( $e['custom_data']['currency'] ) ) {
-					$item['currency'] = $e['custom_data']['currency'];
-				}
+				if ( isset( $e['custom_data']['value'] ) ) $item['price'] = floatval( $e['custom_data']['value'] );
+				if ( isset( $e['custom_data']['currency'] ) ) $item['currency'] = sanitize_text_field( $e['custom_data']['currency'] );
+				if ( isset( $e['custom_data']['item_ids'] ) && is_array( $e['custom_data']['item_ids'] ) ) $item['item_ids'] = array_map( 'sanitize_text_field', $e['custom_data']['item_ids'] );
 			}
-			
-			$body['event'][] = $item;
+			$body['batch'][] = $item;
 		}
-		
 		$headers = array( 'Content-Type' => 'application/json' );
-		if ( ! empty( $access_token ) ) {
-			$headers['Authorization'] = 'Bearer ' . $access_token;
-		}
-		
+		if ( ! empty( $access_token ) ) $headers['Authorization'] = 'Bearer ' . $access_token;
 		$args = array(
 			'headers' => $headers,
 			'body' => wp_json_encode( $body ),
 			'timeout' => 20,
 			'blocking' => (bool) $blocking,
 		);
-		
 		$response = wp_remote_post( $url, $args );
-		if ( is_wp_error( $response ) ) {
-			self::log( 'error', 'Snapchat send error: ' . $response->get_error_message() );
-		}
-		
+		if ( is_wp_error( $response ) ) self::log( 'error', 'Snapchat send error: ' . $response->get_error_message() );
 		return $response;
 	}
 
@@ -477,11 +507,9 @@ class UP_CAPI {
 	 * Send events to Pinterest Conversions API
 	 */
 	protected static function send_to_pinterest( $tag_id, $access_token, $events = array(), $blocking = true ) {
-		// Pinterest API v5 endpoint
-		$url = 'https://api.pinterest.com/v5/ad_accounts/' . rawurlencode( $tag_id ) . '/events';
-		
+		// Pinterest Conversions API (events endpoint)
+		$url = 'https://api.pinterest.com/v5/events';
 		$body = array( 'data' => array() );
-		
 		foreach ( $events as $e ) {
 			$item = array(
 				'event_name' => isset( $e['event_name'] ) ? $e['event_name'] : 'custom',
@@ -489,46 +517,28 @@ class UP_CAPI {
 				'event_id' => isset( $e['event_id'] ) ? $e['event_id'] : uniqid( 'pin_', true ),
 				'action_source' => 'web',
 			);
-			
-			// Add user data
+			if ( isset( $e['source_url'] ) ) $item['event_source_url'] = esc_url_raw( $e['source_url'] );
 			if ( isset( $e['user_data'] ) && is_array( $e['user_data'] ) ) {
 				$item['user_data'] = array();
-				if ( isset( $e['user_data']['email_hash'] ) ) {
-					$item['user_data']['em'] = array( $e['user_data']['email_hash'] );
-				}
+				if ( isset( $e['user_data']['email_hash'] ) ) $item['user_data']['em'] = array( $e['user_data']['email_hash'] );
 			}
-			
-			// Add custom data
 			if ( isset( $e['custom_data'] ) && is_array( $e['custom_data'] ) ) {
 				$item['custom_data'] = array();
-				if ( isset( $e['custom_data']['value'] ) ) {
-					$item['custom_data']['value'] = floatval( $e['custom_data']['value'] );
-				}
-				if ( isset( $e['custom_data']['currency'] ) ) {
-					$item['custom_data']['currency'] = $e['custom_data']['currency'];
-				}
+				if ( isset( $e['custom_data']['value'] ) ) $item['custom_data']['value'] = floatval( $e['custom_data']['value'] );
+				if ( isset( $e['custom_data']['currency'] ) ) $item['custom_data']['currency'] = sanitize_text_field( $e['custom_data']['currency'] );
 			}
-			
 			$body['data'][] = $item;
 		}
-		
 		$headers = array( 'Content-Type' => 'application/json' );
-		if ( ! empty( $access_token ) ) {
-			$headers['Authorization'] = 'Bearer ' . $access_token;
-		}
-		
+		if ( ! empty( $access_token ) ) $headers['Authorization'] = 'Bearer ' . $access_token;
 		$args = array(
 			'headers' => $headers,
 			'body' => wp_json_encode( $body ),
 			'timeout' => 20,
 			'blocking' => (bool) $blocking,
 		);
-		
 		$response = wp_remote_post( $url, $args );
-		if ( is_wp_error( $response ) ) {
-			self::log( 'error', 'Pinterest send error: ' . $response->get_error_message() );
-		}
-		
+		if ( is_wp_error( $response ) ) self::log( 'error', 'Pinterest send error: ' . $response->get_error_message() );
 		return $response;
 	}
 
