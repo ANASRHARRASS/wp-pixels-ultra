@@ -47,8 +47,10 @@
         injectGTM(UP_CONFIG.gtm_id);
     }
 
-    // Inject Meta Pixel (minimal) if configured
-    if (typeof UP_CONFIG !== 'undefined' && UP_CONFIG.meta_pixel_id) {
+    var GTM_MANAGES = (typeof UP_CONFIG !== 'undefined' && !!UP_CONFIG.gtm_manage_pixels);
+
+    // Inject Meta Pixel (minimal) if configured and not managed by GTM
+    if (!GTM_MANAGES && typeof UP_CONFIG !== 'undefined' && UP_CONFIG.meta_pixel_id) {
         (function (f, b, e, v, n, t, s) {
             if (f.fbq) return;
             n = f.fbq = function () { n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments); };
@@ -60,8 +62,8 @@
         try { window.fbq('init', UP_CONFIG.meta_pixel_id); window.fbq('track', 'PageView'); } catch (err) { /* ignore */ }
     }
 
-    // Inject TikTok Pixel (minimal) if configured
-    if (typeof UP_CONFIG !== 'undefined' && UP_CONFIG.tiktok_pixel_id) {
+    // Inject TikTok Pixel (minimal) if configured and not managed by GTM
+    if (!GTM_MANAGES && typeof UP_CONFIG !== 'undefined' && UP_CONFIG.tiktok_pixel_id) {
         (function (w, d, t) {
             w.TiktokAnalyticsObject = t;
             var ttq = w[t] = w[t] || [];
@@ -80,8 +82,8 @@
         })(window, document, 'ttq');
     }
 
-    // Inject Snapchat Pixel if configured
-    if (typeof UP_CONFIG !== 'undefined' && UP_CONFIG.snapchat_pixel_id) {
+    // Inject Snapchat Pixel if configured and not managed by GTM
+    if (!GTM_MANAGES && typeof UP_CONFIG !== 'undefined' && UP_CONFIG.snapchat_pixel_id) {
         (function (e, t, n) {
             if (e.snaptr) return;
             var a = e.snaptr = function () { a.handleRequest ? a.handleRequest.apply(a, arguments) : a.queue.push(arguments); };
@@ -95,8 +97,8 @@
         try { window.snaptr('init', UP_CONFIG.snapchat_pixel_id); window.snaptr('track', 'PAGE_VIEW'); } catch (err) { /* ignore */ }
     }
 
-    // Inject Pinterest Tag if configured
-    if (typeof UP_CONFIG !== 'undefined' && UP_CONFIG.pinterest_tag_id) {
+    // Inject Pinterest Tag if configured and not managed by GTM
+    if (!GTM_MANAGES && typeof UP_CONFIG !== 'undefined' && UP_CONFIG.pinterest_tag_id) {
         (function (e) {
             if (!window.pintrk) {
                 window.pintrk = function () { window.pintrk.queue.push(Array.prototype.slice.call(arguments)); };

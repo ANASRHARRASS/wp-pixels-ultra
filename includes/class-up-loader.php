@@ -51,6 +51,7 @@ class UP_Loader {
                     'google_ads_id' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'google_ads_id', '' ) : '',
                     'snapchat_pixel_id' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'snapchat_pixel_id', '' ) : '',
                     'pinterest_tag_id' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'pinterest_tag_id', '' ) : '',
+                    'gtm_manage_pixels' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'gtm_manage_pixels', 'no' ) === 'yes' : false,
                     // NOTE: server_secret is intentionally NOT exposed to client-side.
                 ) );
             }

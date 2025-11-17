@@ -69,6 +69,7 @@ class UP_Settings {
             'google_ads_id'     => '',
             'snapchat_pixel_id' => '',
             'pinterest_tag_id'  => '',
+            'gtm_manage_pixels' => 'no',
             'enable_gtm'        => 'no',
             'enable_meta'       => 'no',
             'enable_tiktok'     => 'no',
@@ -104,6 +105,7 @@ class UP_Settings {
                     case 'enable_google_ads':
                     case 'enable_snapchat':
                     case 'enable_pinterest':
+                    case 'gtm_manage_pixels':
                         $out[ $key ] = ( $val === 'yes' ) ? 'yes' : 'no';
                         break;
                     case 'rate_limit_ip_per_min':
@@ -168,6 +170,16 @@ class UP_Settings {
             <form method="post" action="options.php">
                 <?php settings_fields( 'up_settings_group' ); ?>
                 <table class="form-table">
+                    <tr>
+                        <th scope="row"><label for="gtm_manage_pixels">Let GTM manage all client pixels</label></th>
+                        <td>
+                            <select name="up_settings[gtm_manage_pixels]" id="gtm_manage_pixels">
+                                <option value="no" <?php selected( $opts['gtm_manage_pixels'], 'no' ); ?>>No</option>
+                                <option value="yes" <?php selected( $opts['gtm_manage_pixels'], 'yes' ); ?>>Yes</option>
+                            </select>
+                            <p class="description">When set to Yes, the plugin will NOT inject Meta/TikTok/Snapchat/Pinterest base code; use GTM tags instead. Server-side queue still runs.</p>
+                        </td>
+                    </tr>
                     <tr>
                         <th scope="row"><label for="gtm_container_id">GTM Container ID</label></th>
                         <td><input name="up_settings[gtm_container_id]" id="gtm_container_id" type="text" value="<?php echo esc_attr( $opts['gtm_container_id'] ); ?>" class="regular-text" /></td>
