@@ -1,13 +1,13 @@
 {
   "name": "wp-pixels-ultra",
-  "version": "0.4.2",
-  "description": "WordPress plugin scaffold for server-side pixel forwarding and Conversions API (CAPI) integration",
+  "version": "0.4.3",
+  "description": "Production-ready WordPress plugin for server-side pixel forwarding and Conversions API (CAPI) integration",
   "main": "wp-pixels-ultra.php",
   "scripts": {
     "build": "webpack --mode production",
     "dev": "webpack --mode development --watch",
-    "lint": "eslint assets/ includes/ --ext .js,.jsx",
-    "lint:fix": "eslint assets/ includes/ --ext .js,.jsx --fix",
+    "lint": "eslint assets/ --ext .js,.jsx",
+    "lint:fix": "eslint assets/ --ext .js,.jsx --fix",
     "format": "prettier --write 'assets/**/*.js' 'includes/**/*.php'",
     "format:check": "prettier --check 'assets/**/*.js'",
     "test": "echo \"Error: no test specified\" && exit 1",

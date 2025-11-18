@@ -31,16 +31,21 @@ A production-ready WordPress plugin for **GTM-first tracking** with comprehensiv
 
 ## Quick Start
 
-### Option 1: GTM-First Setup (Recommended)
-1. Import container JSON (GTM Admin → Import → Select `gtm-templates/ultra-pixels-gtm-container.json`).
+### Option 1: GTM-First Setup (Recommended) ⭐ Production-Ready
+1. Import the **production-ready** container JSON: `gtm-templates/ultra-pixels-gtm-container.json`
+   - Includes 6 pre-configured tags (Meta, TikTok, GA4)
+   - 5 custom triggers for all event types
+   - 13 data layer variables ready to use
+   - ✅ Full browser compatibility (Chrome, Firefox, Safari, Edge)
+   - ✅ Enhanced JSON validation and error handling
 2. Configure plugin settings:
    - GTM Container ID: `GTM-XXXXXX`
    - Let GTM manage all client pixels: Yes
    - Enter pixel IDs (Meta, TikTok, etc.) for server-side queueing.
-3. Update GTM variables with your IDs if needed.
+3. Update GTM variables with your pixel IDs.
 4. Test in GTM Preview & publish.
 
-📚 Full Guide: See [GTM_SETUP.md](./GTM_SETUP.md)
+📚 **New**: [GTM Import Guide](./GTM-IMPORT-GUIDE.md) | [Full Setup Guide](./GTM_SETUP.md)
 
 ### Option 2: Direct Pixel Setup
 - Set GTM manage flag to No.
@@ -146,6 +151,14 @@ Key files: loader, events, rest, capi, settings, pixel-loader.
 DB tables: `up_capi_queue`, `up_capi_deadletter`.
 
 ## Changelog
+### v0.4.3 (November 2025) - Production Improvements
+- 🚀 **Production-Ready GTM JSON**: Enhanced both GTM container templates with proper format version, timestamps, and metadata
+- 🛡️ **Enhanced Client-Side Validation**: Improved JSON parsing and error handling in pixel-loader.js
+- ✅ **Browser Compatibility**: Added dataLayer validation to prevent conflicts with third-party scripts
+- 📝 **Better Error Messages**: Detailed console warnings for debugging without breaking functionality
+- 📚 **New Documentation**: Added comprehensive [GTM-IMPORT-GUIDE.md](./GTM-IMPORT-GUIDE.md) for production deployments
+- 🔧 **Build Improvements**: Fixed linter configuration to exclude PHP-only directories
+
 ### v0.4.2 (November 2025)
 - fix(git-updater): Align `Text Domain` to `wp-pixels-ultra` to match plugin folder slug and resolve Git Updater warnings (Undefined array key 'wp-pixels-ultra' and header notices). No tracking or behavioral changes.
 
