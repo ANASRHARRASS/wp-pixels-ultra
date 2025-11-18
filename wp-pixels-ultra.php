@@ -2,9 +2,9 @@
 /**
  * Plugin Name: Ultra Pixels Ultra
  * Description: GTM-first tracking with Meta, TikTok, Google Ads, Snapchat, Pinterest. Features Enhanced Ecommerce, Elementor integration, auto form tracking, and enterprise CAPI queue.
- * Version: 0.4.1
+ * Version: 0.4.2
  * Author: anas
- * Text Domain: ultra-pixels-ultra
+ * Text Domain: wp-pixels-ultra
  * Requires PHP: 7.4
  * Requires at least: 5.8
  * Tested up to: 6.6
@@ -24,7 +24,7 @@ define( 'UP_PLUGIN_URL', plugin_dir_url( UP_PLUGIN_FILE ) );
 
 // version constant for asset busting and compatibility checks
 if ( ! defined( 'UP_VERSION' ) ) {
-    define( 'UP_VERSION', '0.4.1' );
+    define( 'UP_VERSION', '0.4.2' );
 }
 
 // always load the loader if present (it wires admin/front)
