@@ -1,8 +1,23 @@
-# What's New in Ultra Pixels Ultra v0.3.0
+# What's New in Ultra Pixels Ultra
 
-## 🎯 Major Update: GTM-First Architecture
+## ✨ Latest: v0.4.2 (November 2025)
 
-This release transforms Ultra Pixels Ultra into a comprehensive, GTM-first tracking solution with enterprise-grade features and support for 6+ advertising platforms.
+**Quick Fix Release**
+- 🏷️ **Text Domain Fix**: Aligned `Text Domain` to `wp-pixels-ultra` to match plugin folder slug and resolve Git Updater warnings (Undefined array key 'wp-pixels-ultra' and header notices)
+- No tracking or behavioral changes
+
+## ✨ New in v0.4.0
+
+**Enhanced Consent, Health & Multi-Platform Support**
+- 🩺 **Health Endpoint**: `GET /wp-json/up/v1/health` for lightweight diagnostics (queue length, dead-letter count, platform flags, recent logs)
+- 🛡️ **Consent & Region Gating**: Client script honors `window.UP_CONSENT`, `window.UP_REGION`, and `window.UP_REGION_BLOCKED` before injecting ad pixels or forwarding events
+- 🧩 **Dedicated Tokens**: Settings for Snapchat API token, Pinterest access token, Google Ads conversion label
+- 🔄 **Richer Adapters**: Snapchat & Pinterest Conversions API payload enhancements; Google Ads middleware forwarding stub via server container path
+- ⚙️ **Settings Expansion**: New secure fields (never localized client-side)
+
+## 🎯 Major Update: v0.3.0 - GTM-First Architecture
+
+This release transformed Ultra Pixels Ultra into a comprehensive, GTM-first tracking solution with enterprise-grade features and support for 6+ advertising platforms.
 
 ## ✨ New Features
 

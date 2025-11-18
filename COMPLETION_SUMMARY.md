@@ -1,7 +1,8 @@
 # Event Mapping & Landing Page Integration - Completion Summary
 
 **Date**: November 13, 2025  
-**Version**: 0.2.0
+**Version**: 0.4.2  
+**Note**: This summary documents features implemented in v0.2.0, now part of v0.4.2
 
 ---
 

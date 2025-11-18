@@ -333,5 +333,5 @@ For issues or questions:
 
 ---
 
-**Version**: 0.2.0  
+**Version**: 0.4.2  
 **Last Updated**: November 2025
