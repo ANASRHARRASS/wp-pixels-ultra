@@ -1,6 +1,6 @@
 # Ultra Pixels Ultra
 
-**Version**: 0.4.1
+**Version**: 0.4.2
 
 A production-ready WordPress plugin for **GTM-first tracking** with comprehensive support for Meta, TikTok, Google Ads, Snapchat, Pinterest, and custom platforms. Features server-side CAPI forwarding, Enhanced Ecommerce, Elementor integration, automatic form tracking, and enterprise-grade queue management.
 
@@ -146,6 +146,9 @@ Key files: loader, events, rest, capi, settings, pixel-loader.
 DB tables: `up_capi_queue`, `up_capi_deadletter`.
 
 ## Changelog
+### v0.4.2 (November 2025)
+- fix(git-updater): Align `Text Domain` to `wp-pixels-ultra` to match plugin folder slug and resolve Git Updater warnings (Undefined array key 'wp-pixels-ultra' and header notices). No tracking or behavioral changes.
+
 ### v0.2.0 (November 2025)
 - DB-backed queue, dead-letter, enhanced WooCommerce, WhatsApp tracking, mapping UI, security hardening, WP-CLI.
 ### v0.1.0
