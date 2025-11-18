@@ -1,18 +1,18 @@
 {
   "exportFormatVersion": 2,
-  "exportTime": "2025-11-15 16:58:00",
+  "exportTime": "2025-11-18 03:16:48",
   "containerVersion": {
     "path": "accounts/XXXXXX/containers/XXXXXX/versions/0",
     "accountId": "XXXXXX",
     "containerId": "XXXXXX",
     "containerVersionId": "0",
-    "name": "Ultra Pixels - Complete Setup",
-    "description": "Complete GTM setup for Ultra Pixels plugin with Meta, TikTok, and Google Ads integration. Import this container and configure your pixel IDs in variables.",
+    "name": "Ultra Pixels v0.4.2 - Production Release",
+    "description": "Production-ready GTM container for Ultra Pixels plugin v0.4.2+. Includes complete tracking for Meta Pixel, TikTok Pixel, Google Analytics 4, with support for Enhanced Ecommerce, form tracking, WhatsApp tracking, and custom events. Import this container and configure your pixel IDs in the constant variables. Compatible with all modern browsers and GTM's unified event schema (up_event).",
     "container": {
       "path": "accounts/XXXXXX/containers/XXXXXX",
       "accountId": "XXXXXX",
       "containerId": "XXXXXX",
-      "name": "Ultra Pixels Tracking",
+      "name": "Ultra Pixels - Production",
       "publicId": "GTM-XXXXXX",
       "usageContext": [
         "WEB"

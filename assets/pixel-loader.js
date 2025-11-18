@@ -1,6 +1,14 @@
 (function () {
     'use strict';
 
+    // Validate UP_CONFIG is properly structured
+    if (typeof UP_CONFIG !== 'undefined') {
+        if (typeof UP_CONFIG !== 'object' || UP_CONFIG === null) {
+            console.error('UP: Invalid UP_CONFIG - expected object, got', typeof UP_CONFIG);
+            window.UP_CONFIG = undefined;
+        }
+    }
+
     // Consent + region gating helpers (non-blocking defaults)
     function getConsentState() {
         var c = window.UP_CONSENT || {};
@@ -22,16 +30,25 @@
     function sendToServer(event) {
         if (typeof UP_CONFIG === 'undefined' || !UP_CONFIG.ingest_url) return;
         try {
+            // Validate event data can be serialized
+            var body = JSON.stringify(event);
+            if (!body || body === '{}' || body === 'null') {
+                console.warn('UP: Empty or invalid event data, skipping server forward');
+                return;
+            }
+            
             var headers = { 'Content-Type': 'application/json' };
             // Use WP REST nonce for same-origin authorization instead of exposing server secret
             if (UP_CONFIG.nonce) headers['X-WP-Nonce'] = UP_CONFIG.nonce;
             fetch(UP_CONFIG.ingest_url, {
                 method: 'POST',
                 headers: headers,
-                body: JSON.stringify(event),
+                body: body,
                 keepalive: true
-            }).catch(function (e) { console.warn('UP server forward failed', e); });
-        } catch (e) { console.warn('UP forward error', e); }
+            }).catch(function (e) { console.warn('UP server forward failed:', e.message); });
+        } catch (e) { 
+            console.error('UP forward error:', e.message, event); 
+        }
     }
 
     function generateEventId() {
@@ -135,11 +152,22 @@
     }
 
     // Push to dataLayer for GTM first
-    window.dataLayer = window.dataLayer || [];
-    window.dataLayer.push(event);
+    try {
+        window.dataLayer = window.dataLayer || [];
+        if (Array.isArray(window.dataLayer)) {
+            window.dataLayer.push(event);
+        } else {
+            console.warn('UP: dataLayer is not an array, reinitializing');
+            window.dataLayer = [event];
+        }
+    } catch (err) {
+        console.error('UP: Failed to push to dataLayer:', err);
+    }
 
     // Fire server copy
-    sendToServer(event);
+    if (CONSENT.analytics && !REGION_BLOCKED) {
+        sendToServer(event);
+    }
 
     // Optionally fire vendor client snippets here (fbq, TikTok) if present
 
@@ -161,7 +189,9 @@
                 var phone = u.pathname.replace(/\//g, '').split('?')[0] || (u.searchParams.get('phone') || '');
                 return { phone: phone, text: u.searchParams.get('text') || '' };
             }
-        } catch (e) { }
+        } catch (e) { 
+            // Silently ignore malformed URLs
+        }
         return null;
     }
 
@@ -172,7 +202,16 @@
             var eventName = el.getAttribute('data-up-event') || (el.getAttribute('data-up-whatsapp') ? 'whatsapp_click' : (el.classList.contains('up-whatsapp') ? 'whatsapp_click' : null));
             var payload = {};
             if (el.getAttribute('data-up-payload')) {
-                try { payload = JSON.parse(el.getAttribute('data-up-payload')); } catch (err) { payload = {}; }
+                try { 
+                    var parsed = JSON.parse(el.getAttribute('data-up-payload'));
+                    // Validate that parsed value is an object (not array, null, or primitive)
+                    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                        payload = parsed;
+                    }
+                } catch (err) { 
+                    console.warn('UP: Invalid JSON in data-up-payload:', err.message);
+                    payload = {}; 
+                }
             }
 
             // If it's a link, try parse whatsapp details
@@ -203,14 +242,20 @@
             };
 
             // push to dataLayer for GTM
-            window.dataLayer = window.dataLayer || [];
-            window.dataLayer.push(ev);
+            try {
+                window.dataLayer = window.dataLayer || [];
+                if (Array.isArray(window.dataLayer)) {
+                    window.dataLayer.push(ev);
+                }
+            } catch (dlErr) {
+                console.error('UP: dataLayer push failed:', dlErr);
+            }
 
             // send to server only if analytics consent granted
             if (CONSENT.analytics && !REGION_BLOCKED) {
                 sendToServer(ev);
             }
-        } catch (err) { console.warn('UP click handler error', err); }
+        } catch (err) { console.warn('UP click handler error:', err.message); }
     }
 
     // listen capture to catch clicks early (works for dynamically added elements too)
@@ -261,13 +306,20 @@
             }
 
             // Push to dataLayer
-            window.dataLayer = window.dataLayer || [];
-            window.dataLayer.push(formEvent);
+            try {
+                window.dataLayer = window.dataLayer || [];
+                if (Array.isArray(window.dataLayer)) {
+                    window.dataLayer.push(formEvent);
+                }
+            } catch (dlErr) {
+                console.error('UP: dataLayer push failed:', dlErr);
+            }
+            
             if (CONSENT.analytics && !REGION_BLOCKED) {
                 sendToServer(formEvent);
             }
         } catch (err) {
-            console.warn('UP form handler error', err);
+            console.warn('UP form handler error:', err.message);
         }
     }
 
@@ -297,8 +349,15 @@
                         }
                     };
 
-                    window.dataLayer = window.dataLayer || [];
-                    window.dataLayer.push(scrollEvent);
+                    try {
+                        window.dataLayer = window.dataLayer || [];
+                        if (Array.isArray(window.dataLayer)) {
+                            window.dataLayer.push(scrollEvent);
+                        }
+                    } catch (dlErr) {
+                        console.error('UP: dataLayer push failed:', dlErr);
+                    }
+                    
                     if (CONSENT.analytics && !REGION_BLOCKED) {
                         sendToServer(scrollEvent);
                     }
