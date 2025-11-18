@@ -1,6 +1,6 @@
 # Ultra Pixels Ultra
 
-**Version**: 0.4.0
+**Version**: 0.4.1
 
 A production-ready WordPress plugin for **GTM-first tracking** with comprehensive support for Meta, TikTok, Google Ads, Snapchat, Pinterest, and custom platforms. Features server-side CAPI forwarding, Enhanced Ecommerce, Elementor integration, automatic form tracking, and enterprise-grade queue management.
 
@@ -32,7 +32,7 @@ A production-ready WordPress plugin for **GTM-first tracking** with comprehensiv
 ## Quick Start
 
 ### Option 1: GTM-First Setup (Recommended)
-1. Import container JSON (GTM Admin → Import → Select `gtm-container-up-template.json`).
+1. Import container JSON (GTM Admin → Import → Select `gtm-templates/ultra-pixels-gtm-container.json`).
 2. Configure plugin settings:
    - GTM Container ID: `GTM-XXXXXX`
    - Let GTM manage all client pixels: Yes
