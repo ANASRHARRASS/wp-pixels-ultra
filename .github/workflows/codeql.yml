@@ -5,9 +5,10 @@
 # or to provide custom queries or build logic.
 #
 # ******** NOTE ********
-# We have attempted to detect the languages in your repository. Please check
-# the `language` matrix defined below to confirm you have the correct set of
-# supported CodeQL languages.
+# This repository is primarily PHP (wp-pixels-ultra.php, includes/*.php), but CodeQL does NOT support PHP analysis.
+# Only JavaScript/TypeScript analysis is configured, covering assets in assets/*.js and similar.
+# The `language` matrix below should only include supported CodeQL languages (e.g., javascript/typescript).
+# This limitation is intentional and should be preserved unless CodeQL adds PHP support in the future.
 #
 name: "CodeQL Advanced"
 
@@ -27,7 +28,7 @@ jobs:
     #   - https://gh.io/supported-runners-and-hardware-resources
     #   - https://gh.io/using-larger-runners (GitHub.com only)
     # Consider using larger runners or machines with greater resources for possible analysis time improvements.
-    runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     permissions:
       # required for all workflows
       security-events: write
@@ -96,4 +97,4 @@ jobs:
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v4
       with:
-        category: "/language:${{matrix.language}}"
+        category: "/language:${{ matrix.language }}"
