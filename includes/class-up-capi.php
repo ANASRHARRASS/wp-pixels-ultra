@@ -269,6 +269,16 @@ class UP_CAPI {
 	 */
 	protected static function send_batch( $platform, $events = array() ) {
 		if ( empty( $events ) ) return new WP_Error( 'no_events', 'No events to send' );
+		
+		// Check if GTM forwarder is enabled
+		$use_gtm_forwarder = UP_Settings::get( 'use_gtm_forwarder', 'no' ) === 'yes';
+		
+		if ( $use_gtm_forwarder ) {
+			// Route all events through GTM Server Container
+			return self::send_to_gtm_server( $platform, $events, true );
+		}
+		
+		// Original platform-specific routing
 		$token = UP_Settings::get( 'capi_token', '' );
 		$meta_id = UP_Settings::get( 'meta_pixel_id', '' );
 		$tiktok_id = UP_Settings::get( 'tiktok_pixel_id', '' );
@@ -539,6 +549,90 @@ class UP_CAPI {
 		);
 		$response = wp_remote_post( $url, $args );
 		if ( is_wp_error( $response ) ) self::log( 'error', 'Pinterest send error: ' . $response->get_error_message() );
+		return $response;
+	}
+
+	/**
+	 * Send events to GTM Server Container for unified routing
+	 * 
+	 * @param string $platform Platform identifier (meta, tiktok, google_ads, etc.)
+	 * @param array $events Array of event payloads
+	 * @param bool $blocking Whether to wait for response
+	 * @return array|WP_Error Response from GTM server
+	 */
+	protected static function send_to_gtm_server( $platform, $events = array(), $blocking = true ) {
+		$gtm_server_url = UP_Settings::get( 'gtm_server_url', '' );
+		
+		if ( empty( $gtm_server_url ) ) {
+			self::log( 'error', 'GTM forwarder enabled but gtm_server_url not configured' );
+			return new WP_Error( 'gtm_not_configured', 'GTM Server Container URL is required for GTM forwarding.' );
+		}
+		
+		// Build the endpoint URL - use a standard path for event ingestion
+		$endpoint = trailingslashit( $gtm_server_url ) . 'event';
+		
+		// Get platform-specific IDs for forwarding to GTM
+		$pixel_ids = array(
+			'meta_pixel_id' => UP_Settings::get( 'meta_pixel_id', '' ),
+			'tiktok_pixel_id' => UP_Settings::get( 'tiktok_pixel_id', '' ),
+			'google_ads_id' => UP_Settings::get( 'google_ads_id', '' ),
+			'google_ads_label' => UP_Settings::get( 'google_ads_label', '' ),
+			'snapchat_pixel_id' => UP_Settings::get( 'snapchat_pixel_id', '' ),
+			'pinterest_tag_id' => UP_Settings::get( 'pinterest_tag_id', '' ),
+		);
+		
+		// Prepare batch payload for GTM server
+		$payload = array(
+			'platform' => $platform,
+			'events' => $events,
+			'pixel_ids' => $pixel_ids,
+			'source' => 'wordpress',
+			'site_url' => home_url(),
+			'timestamp' => time(),
+		);
+		
+		// Optional: include CAPI token if configured (GTM server might need it for platform APIs)
+		$capi_token = UP_Settings::get( 'capi_token', '' );
+		$snapchat_token = UP_Settings::get( 'snapchat_api_token', '' );
+		$pinterest_token = UP_Settings::get( 'pinterest_access_token', '' );
+		
+		// Add platform-specific tokens to payload (GTM will use them to call platform APIs)
+		if ( ! empty( $capi_token ) ) {
+			$payload['tokens'] = array( 'capi_token' => $capi_token );
+		}
+		if ( ! empty( $snapchat_token ) ) {
+			if ( ! isset( $payload['tokens'] ) ) $payload['tokens'] = array();
+			$payload['tokens']['snapchat_api_token'] = $snapchat_token;
+		}
+		if ( ! empty( $pinterest_token ) ) {
+			if ( ! isset( $payload['tokens'] ) ) $payload['tokens'] = array();
+			$payload['tokens']['pinterest_access_token'] = $pinterest_token;
+		}
+		
+		$args = array(
+			'timeout' => 20,
+			'headers' => array(
+				'Content-Type' => 'application/json',
+				'Accept' => 'application/json',
+				'User-Agent' => 'WordPress-UltraPixels/' . ( defined( 'UP_VERSION' ) ? UP_VERSION : '1.0' ),
+			),
+			'body' => wp_json_encode( $payload ),
+			'blocking' => (bool) $blocking,
+		);
+		
+		$response = wp_remote_post( $endpoint, $args );
+		
+		if ( is_wp_error( $response ) ) {
+			self::log( 'error', sprintf( 'GTM forwarder error (%s): %s', $platform, $response->get_error_message() ) );
+		} elseif ( is_array( $response ) && isset( $response['response']['code'] ) ) {
+			$code = intval( $response['response']['code'] );
+			if ( $code >= 200 && $code < 300 ) {
+				self::log( 'info', sprintf( 'GTM forwarded %d events for platform %s (HTTP %d)', count( $events ), $platform, $code ) );
+			} else {
+				self::log( 'error', sprintf( 'GTM forwarder HTTP %d for platform %s', $code, $platform ) );
+			}
+		}
+		
 		return $response;
 	}
 
