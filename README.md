@@ -4,6 +4,13 @@
 
 A production-ready WordPress plugin for **GTM-first tracking** with comprehensive support for Meta, TikTok, Google Ads, Snapchat, Pinterest, and custom platforms. Features server-side CAPI forwarding, Enhanced Ecommerce, Elementor integration, automatic form tracking, and enterprise-grade queue management.
 
+## ✨ New in v0.4.4
+
+- 🚀 **GTM Server Forwarder**: Unified event forwarding through GTM server-side container for all platforms
+- 🎯 **Simplified Architecture**: Route all server-side events through GTM instead of direct platform API calls
+- 🔄 **Centralized Management**: Configure once in GTM, reduce WordPress configuration complexity
+- ⚡ **Better Performance**: Single endpoint for all platforms, improved reliability and monitoring
+
 ## ✨ New in v0.4.0
 
 - 🩺 **Health Endpoint**: `GET /wp-json/up/v1/health` for lightweight diagnostics (queue length, dead-letter count, platform flags, recent logs)
@@ -59,7 +66,8 @@ A production-ready WordPress plugin for **GTM-first tracking** with comprehensiv
 - 6+ Platforms: Meta, TikTok, Google Ads, Snapchat, Pinterest + custom endpoints.
 - Enhanced Ecommerce with full transaction data.
 - Event deduplication via deterministic `event_id` for purchases & forms.
-- Optional server-side GTM container URL for middleware forwarding.
+- **GTM Server Forwarder**: Route all server-side events through GTM server-side container for unified platform management.
+- Optional fallback to direct platform API calls when GTM forwarding is disabled.
 
 ### 🛒 WooCommerce Integration
 Auto-track: `PageView`, `view_item`, `add_to_cart`, `begin_checkout`, `purchase` with ecommerce.items & hashed user data.
@@ -122,6 +130,77 @@ Optional constants in `wp-config.php`:
 define( 'UP_SERVER_SECRET', 'your-secure-secret-key' );
 define( 'UP_CAPI_ENDPOINT', 'https://example.com/capi' );
 ```
+
+### GTM Server Forwarder Setup
+The GTM Server Forwarder routes all server-side events through your GTM server-side container instead of making direct API calls to each platform (Meta, TikTok, etc.).
+
+**Benefits:**
+- ✅ Centralized event routing and transformation in GTM
+- ✅ Single endpoint reduces WordPress configuration complexity
+- ✅ Better debugging and monitoring through GTM interface
+- ✅ Easier to add/remove platforms without WordPress changes
+- ✅ Improved reliability with GTM's robust infrastructure
+
+**Setup Steps:**
+
+1. **Configure GTM Server Container**
+   - Set up a Google Tag Manager server-side container
+   - Configure server-side tags for each platform (Meta, TikTok, Google Ads, etc.)
+   - Note your GTM server container URL (e.g., `https://your-gtm-server.com`)
+
+2. **Enable in WordPress Plugin Settings**
+   - Go to **WordPress Admin → Ultra Pixels → Settings**
+   - Set **GTM Server Container URL**: `https://your-gtm-server.com`
+   - Enable **Use GTM Server for Event Forwarding**: Yes
+   - Enter pixel IDs for each platform (these will be sent to GTM)
+   - Optionally add platform API tokens (GTM will use these for API calls)
+   - Save changes
+
+3. **Configure GTM Server Container**
+   - Create a custom endpoint at `/event` (or update the path in the code)
+   - Parse incoming JSON payload with structure:
+     ```json
+     {
+       "platform": "meta|tiktok|google_ads|snapchat|pinterest",
+       "events": [
+         {
+           "event_name": "Purchase",
+           "event_id": "order_12345",
+           "event_time": 1234567890,
+           "user_data": {"email_hash": "...", "phone_hash": "..."},
+           "custom_data": {"value": 99.99, "currency": "USD"}
+         }
+       ],
+       "pixel_ids": {
+         "meta_pixel_id": "...",
+         "tiktok_pixel_id": "...",
+         "google_ads_id": "...",
+         "snapchat_pixel_id": "...",
+         "pinterest_tag_id": "..."
+       },
+       "tokens": {
+         "capi_token": "...",
+         "snapchat_api_token": "...",
+         "pinterest_access_token": "..."
+       },
+       "source": "wordpress",
+       "site_url": "https://example.com",
+       "timestamp": 1234567890
+     }
+     ```
+   - Route events to appropriate platform tags based on `platform` field
+   - Use provided tokens and pixel IDs for platform API calls
+
+4. **Test the Integration**
+   - Trigger a test event (e.g., add to cart)
+   - Check **WordPress Admin → Ultra Pixels → Settings** queue
+   - Monitor GTM server container logs
+   - Verify events appear in platform Event Managers
+
+**Fallback Mode:**
+- If GTM forwarding is disabled, the plugin falls back to direct platform API calls
+- Existing platform-specific configurations (tokens, IDs) are still used
+- No events are lost during configuration changes
 
 ## Usage
 

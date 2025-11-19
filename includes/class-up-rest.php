@@ -3,11 +3,12 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 class UP_REST {
     public static function register_routes() {
-        register_rest_route( 'up/v1', '/ingest', array(
-            'methods' => 'POST',
-            'callback' => array( __CLASS__, 'ingest' ),
-            'permission_callback' => '__return_true',
-        ) );
+        // NOTE: /ingest route moved to class-up-rest-ingest.php for GTM forwarder
+        // register_rest_route( 'up/v1', '/ingest', array(
+        //     'methods' => 'POST',
+        //     'callback' => array( __CLASS__, 'ingest' ),
+        //     'permission_callback' => '__return_true',
+        // ) );
 
         register_rest_route( 'up/v1', '/test', array(
             'methods' => 'POST',

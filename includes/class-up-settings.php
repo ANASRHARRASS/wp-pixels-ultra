@@ -80,6 +80,7 @@ class UP_Settings {
             'enable_snapchat'   => 'no',
             'enable_pinterest'  => 'no',
             'gtm_server_url'    => '',
+            'use_gtm_forwarder' => 'no',
             'server_secret'     => '',
             'capi_endpoint'     => '',
             'capi_token'        => '',
@@ -109,6 +110,7 @@ class UP_Settings {
                     case 'enable_snapchat':
                     case 'enable_pinterest':
                     case 'gtm_manage_pixels':
+                    case 'use_gtm_forwarder':
                         $out[ $key ] = ( $val === 'yes' ) ? 'yes' : 'no';
                         break;
                     case 'rate_limit_ip_per_min':
@@ -290,6 +292,16 @@ class UP_Settings {
                         <th scope="row"><label for="gtm_server_url">GTM Server Container URL</label></th>
                         <td><input name="up_settings[gtm_server_url]" id="gtm_server_url" type="text" value="<?php echo esc_attr( $opts['gtm_server_url'] ); ?>" class="regular-text" />
                         <p class="description">Optional: Enter your server-side GTM container URL for enhanced measurement</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="use_gtm_forwarder">Use GTM Server for Event Forwarding</label></th>
+                        <td>
+                            <select name="up_settings[use_gtm_forwarder]" id="use_gtm_forwarder">
+                                <option value="no" <?php selected( $opts['use_gtm_forwarder'], 'no' ); ?>>No</option>
+                                <option value="yes" <?php selected( $opts['use_gtm_forwarder'], 'yes' ); ?>>Yes</option>
+                            </select>
+                            <p class="description">When enabled, all server-side events are forwarded to GTM Server Container instead of directly calling platform APIs. Requires GTM Server Container URL to be configured.</p>
                         </td>
                     </tr>
                     <tr>
