@@ -61,6 +61,35 @@ class UP_REST_Ingest {
             return new WP_Error( 'invalid_payload', __( 'Invalid JSON payload.' ), array( 'status' => 400 ) );
         }
 
+        // Basic rate limiting: per-IP and per-token (server secret) counters
+        $retry_after = class_exists( 'UP_Settings' ) ? max( 1, intval( UP_Settings::get( 'retry_after_seconds', 60 ) ) ) : 60;
+        $ip_limit   = class_exists( 'UP_Settings' ) ? intval( UP_Settings::get( 'rate_limit_ip_per_min', 60 ) ) : 60;
+        $token_limit= class_exists( 'UP_Settings' ) ? intval( UP_Settings::get( 'rate_limit_token_per_min', 600 ) ) : 600;
+
+        $ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '0.0.0.0';
+        $ip_key = 'up_ingest_ip_' . md5( $ip );
+        $ip_count = intval( get_transient( $ip_key ) );
+        $ip_count++;
+        set_transient( $ip_key, $ip_count, $retry_after );
+        if ( $ip_count > $ip_limit ) {
+            $resp = new WP_REST_Response( array( 'error' => 'rate_limited', 'scope' => 'ip', 'limit' => $ip_limit ), 429 );
+            $resp->header( 'Retry-After', $retry_after );
+            return $resp;
+        }
+
+        $incoming_secret = $request->get_header( 'x-up-secret' );
+        if ( ! empty( $incoming_secret ) ) {
+            $tok_key = 'up_ingest_tok_' . md5( $incoming_secret );
+            $tok_count = intval( get_transient( $tok_key ) );
+            $tok_count++;
+            set_transient( $tok_key, $tok_count, $retry_after );
+            if ( $tok_count > $token_limit ) {
+                $resp = new WP_REST_Response( array( 'error' => 'rate_limited', 'scope' => 'token', 'limit' => $token_limit ), 429 );
+                $resp->header( 'Retry-After', $retry_after );
+                return $resp;
+            }
+        }
+
         // Accept either 'event' or 'event_name'
         if ( empty( $params['event'] ) && empty( $params['event_name'] ) ) {
             return new WP_Error( 'missing_event_name', __( 'event or event_name is required.' ), array( 'status' => 400 ) );
