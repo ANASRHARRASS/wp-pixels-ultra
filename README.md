@@ -1,6 +1,6 @@
 # Ultra Pixels Ultra
 
-**Version**: 0.4.2
+**Version**: 0.4.4
 
 A production-ready WordPress plugin for **GTM-first tracking** with comprehensive support for Meta, TikTok, Google Ads, Snapchat, Pinterest, and custom platforms. Features server-side CAPI forwarding, Enhanced Ecommerce, Elementor integration, automatic form tracking, and enterprise-grade queue management.
 
@@ -230,6 +230,11 @@ Key files: loader, events, rest, capi, settings, pixel-loader.
 DB tables: `up_capi_queue`, `up_capi_deadletter`.
 
 ## Changelog
+### v0.4.4 (November 2025)
+- feat(rest): Public GTM client forwarder — adds `/up/v1/ingest` with nonce, secret, or same-origin auth; server-side enrichment and PII hashing.
+- fix(forwarder): Strip PII from `user_data` and support `user` alias; prefer `sendBeacon` for reliability.
+- feat(capi): Optional GTM server forwarding via `use_gtm_forwarder` + `gtm_server_url`.
+
 ### v0.4.3 (November 2025) - Production Improvements
 - 🚀 **Production-Ready GTM JSON**: Enhanced both GTM container templates with proper format version, timestamps, and metadata
 - 🛡️ **Enhanced Client-Side Validation**: Improved JSON parsing and error handling in pixel-loader.js

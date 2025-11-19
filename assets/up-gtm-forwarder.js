@@ -11,8 +11,8 @@
       var headers = { 'Content-Type': 'application/json' };
       if (wpNonce) headers['X-WP-Nonce'] = wpNonce;
 
-      // Prefer sendBeacon for navigation reliability when nonce not required
-      if (navigator && navigator.sendBeacon && !wpNonce) {
+      // Prefer sendBeacon for navigation reliability; server accepts same-origin without nonce
+      if (navigator && navigator.sendBeacon) {
         try {
           var blob = new Blob([body], { type: 'application/json' });
           navigator.sendBeacon(ingestUrl, blob);
@@ -40,11 +40,15 @@
     window.UP_GTM_FORWARD = function (evt) {
       try {
         if (!evt || typeof evt !== 'object') return;
-        // Remove raw PII coming from GTM; server will handle hashing/advanced matching
-        if (evt.user && (evt.user.email || evt.user.phone || evt.user.phone_number)) {
-          delete evt.user.email;
-          delete evt.user.phone;
-          delete evt.user.phone_number;
+        // Normalize GTM alias: support evt.user but prefer evt.user_data
+        if (evt.user && !evt.user_data) {
+          evt.user_data = evt.user;
+        }
+        // Remove raw PII coming from GTM; server will handle hashing
+        if (evt.user_data) {
+          if (evt.user_data.email) delete evt.user_data.email;
+          if (evt.user_data.phone) delete evt.user_data.phone;
+          if (evt.user_data.phone_number) delete evt.user_data.phone_number;
         }
         if (!evt.event) evt.event = evt.event_name || 'custom_event';
         sendToIngest(evt);

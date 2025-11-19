@@ -27,13 +27,32 @@ class UP_REST_Ingest {
     }
 
     public static function permission_callback( $request ) {
-        $nonce = $request->get_header( 'x-wp-nonce' );
-        $nonce_action = sanitize_key( 'wp_rest' );
-
-        if ( empty( $nonce ) || ! wp_verify_nonce( $nonce, $nonce_action ) ) {
-            return new WP_Error( 'rest_forbidden', __( 'Invalid or missing X-WP-Nonce.' ), array( 'status' => 401 ) );
+        // 1) Allow server secret if provided
+        $incoming_secret = $request->get_header( 'x-up-secret' );
+        $stored_secret   = defined( 'UP_SERVER_SECRET' ) ? UP_SERVER_SECRET : ( class_exists( 'UP_Settings' ) ? UP_Settings::get( 'server_secret', '' ) : '' );
+        if ( ! empty( $incoming_secret ) && ! empty( $stored_secret ) && hash_equals( (string) $stored_secret, (string) $incoming_secret ) ) {
+            return true;
         }
-        return true;
+
+        // 2) Accept valid REST nonce if present
+        $nonce = $request->get_header( 'x-wp-nonce' );
+        if ( ! empty( $nonce ) && wp_verify_nonce( $nonce, 'wp_rest' ) ) {
+            return true;
+        }
+
+        // 3) Same-origin anonymous fallback with rate limiting — check Origin/Referer host match
+        $site_host = parse_url( home_url(), PHP_URL_HOST );
+        $origin    = $request->get_header( 'origin' );
+        $referer   = $request->get_header( 'referer' );
+        $hdr       = $origin ? $origin : $referer;
+        if ( $hdr ) {
+            $hdr_host = parse_url( $hdr, PHP_URL_HOST );
+            if ( $hdr_host && $site_host && strcasecmp( $hdr_host, $site_host ) === 0 ) {
+                return true;
+            }
+        }
+
+        return new WP_Error( 'rest_forbidden', __( 'Unauthorized ingest request.' ), array( 'status' => 401 ) );
     }
 
     public static function ingest_event_callback( WP_REST_Request $request ) {
@@ -58,25 +77,63 @@ class UP_REST_Ingest {
         }
         $custom_data = self::sanitize_custom_data( $params['custom_data'] );
 
+        // Optional consent enforcement: if provided and false, reject
+        if ( isset( $params['consent'] ) && $params['consent'] !== true && $params['consent'] !== 'true' ) {
+            return new WP_Error( 'consent_required', __( 'Consent required' ), array( 'status' => 403 ) );
+        }
+
+        // Hash PII in user_data if present; support alias 'user' from GTM tags
+        $user_data = array();
+        if ( isset( $params['user_data'] ) && is_array( $params['user_data'] ) ) {
+            $user_data = $params['user_data'];
+        } elseif ( isset( $params['user'] ) && is_array( $params['user'] ) ) {
+            $user_data = $params['user'];
+        }
+        if ( ! empty( $user_data ) ) {
+            $clean_ud = array();
+            foreach ( $user_data as $k => $v ) {
+                if ( in_array( $k, array( 'email', 'phone', 'phone_number' ), true ) && is_string( $v ) ) {
+                    $val = strtolower( trim( wp_unslash( $v ) ) );
+                    if ( $k === 'email' ) $clean_ud['email_hash'] = hash( 'sha256', $val );
+                    else $clean_ud['phone_hash'] = hash( 'sha256', preg_replace( '/\D+/', '', $val ) );
+                } else {
+                    $clean_ud[ sanitize_text_field( $k ) ] = is_string( $v ) ? sanitize_text_field( $v ) : $v;
+                }
+            }
+            $user_data = $clean_ud;
+        }
+
         // Enrich server-side
         $client_ip = self::get_client_ip( $request );
         $user_agent = self::get_user_agent( $request );
         $event_time = time();
 
+        // Normalize source URL
+        $source_url = '';
+        if ( ! empty( $params['source_url'] ) ) {
+            $source_url = esc_url_raw( $params['source_url'] );
+        } else {
+            $ref = $request->get_header( 'referer' );
+            if ( $ref ) $source_url = esc_url_raw( $ref );
+        }
+
         $validated_payload = array(
             'event_name'        => $event,
             'event_id'          => $event_id,
             'custom_data'       => $custom_data,
+            'user_data'         => $user_data,
             'client_ip_address' => $client_ip,
             'client_user_agent' => $user_agent,
             'event_time'        => $event_time,
             'received_via'      => 'wp_rest_ingest',
+            'source_url'        => $source_url,
         );
 
         // Use existing queue mechanism
         if ( class_exists( 'UP_CAPI' ) && method_exists( 'UP_CAPI', 'enqueue_event' ) ) {
             try {
-                UP_CAPI::enqueue_event( 'generic', $event, $validated_payload );
+                $platform = isset( $params['platform'] ) ? sanitize_text_field( $params['platform'] ) : 'generic';
+                UP_CAPI::enqueue_event( $platform, $event, $validated_payload );
             } catch ( Throwable $e ) {
                 error_log( '[UP_REST_Ingest] enqueue_event exception: ' . $e->getMessage() );
                 return new WP_Error( 'enqueue_failed', __( 'Failed to enqueue event.' ), array( 'status' => 500 ) );
