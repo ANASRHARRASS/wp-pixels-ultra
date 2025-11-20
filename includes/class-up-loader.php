@@ -80,6 +80,10 @@ class UP_Loader {
         if ( class_exists( 'UP_REST' ) ) {
             add_action( 'rest_api_init', array( 'UP_REST', 'register_routes' ) );
         }
+        // initialize dedicated ingest routes
+        if ( class_exists( 'UP_REST_Ingest' ) ) {
+            UP_REST_Ingest::init();
+        }
         // schedule/process CAPI queue via WP-Cron
         if ( class_exists( 'UP_CAPI' ) ) {
             add_action( 'up_capi_process_queue', array( 'UP_CAPI', 'process_queue' ) );

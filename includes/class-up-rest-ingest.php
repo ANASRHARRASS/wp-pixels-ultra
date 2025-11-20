@@ -96,15 +96,18 @@ class UP_REST_Ingest {
         }
         $event = sanitize_text_field( wp_unslash( $params['event'] ?? $params['event_name'] ) );
 
+        // Generate a unique event_id if not provided, for backward compatibility
         if ( empty( $params['event_id'] ) ) {
-            return new WP_Error( 'missing_event_id', __( 'event_id is required.' ), array( 'status' => 400 ) );
+            $event_id = function_exists( 'wp_generate_uuid4' ) ? wp_generate_uuid4() : substr( hash( 'sha256', uniqid( '', true ) ), 0, 32 );
+        } else {
+            $event_id = sanitize_text_field( wp_unslash( $params['event_id'] ) );
         }
-        $event_id = sanitize_text_field( wp_unslash( $params['event_id'] ) );
 
-        if ( ! isset( $params['custom_data'] ) ) {
-            return new WP_Error( 'missing_custom_data', __( 'custom_data is required (can be empty object/array).' ), array( 'status' => 400 ) );
+        // custom_data is optional; default to empty array if not provided
+        $custom_data = array();
+        if ( isset( $params['custom_data'] ) ) {
+            $custom_data = self::sanitize_custom_data( $params['custom_data'] );
         }
-        $custom_data = self::sanitize_custom_data( $params['custom_data'] );
 
         // Optional consent enforcement: if provided and false, reject
         if ( isset( $params['consent'] ) && $params['consent'] !== true && $params['consent'] !== 'true' ) {
@@ -213,5 +216,3 @@ class UP_REST_Ingest {
         return '';
     }
 }
-
-UP_REST_Ingest::init();

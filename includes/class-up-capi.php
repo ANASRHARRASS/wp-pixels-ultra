@@ -603,22 +603,31 @@ class UP_CAPI {
 			'timestamp' => time(),
 		);
 		
-		// Optional: include CAPI token if configured (GTM server might need it for platform APIs)
+		// Optional: include tokens only to secure endpoints (HTTPS)
 		$capi_token = UP_Settings::get( 'capi_token', '' );
 		$snapchat_token = UP_Settings::get( 'snapchat_api_token', '' );
 		$pinterest_token = UP_Settings::get( 'pinterest_access_token', '' );
-		
-		// Add platform-specific tokens to payload (GTM will use them to call platform APIs)
-		if ( ! empty( $capi_token ) ) {
-			$payload['tokens'] = array( 'capi_token' => $capi_token );
+		$endpoint_scheme = '';
+		$parsed = parse_url( $endpoint );
+		if ( is_array( $parsed ) && isset( $parsed['scheme'] ) ) {
+			$endpoint_scheme = strtolower( $parsed['scheme'] );
 		}
-		if ( ! empty( $snapchat_token ) ) {
-			if ( ! isset( $payload['tokens'] ) ) $payload['tokens'] = array();
-			$payload['tokens']['snapchat_api_token'] = $snapchat_token;
-		}
-		if ( ! empty( $pinterest_token ) ) {
-			if ( ! isset( $payload['tokens'] ) ) $payload['tokens'] = array();
-			$payload['tokens']['pinterest_access_token'] = $pinterest_token;
+		if ( $endpoint_scheme === 'https' ) {
+			if ( ! empty( $capi_token ) ) {
+				$payload['tokens'] = array( 'capi_token' => $capi_token );
+			}
+			if ( ! empty( $snapchat_token ) ) {
+				if ( ! isset( $payload['tokens'] ) ) $payload['tokens'] = array();
+				$payload['tokens']['snapchat_api_token'] = $snapchat_token;
+			}
+			if ( ! empty( $pinterest_token ) ) {
+				if ( ! isset( $payload['tokens'] ) ) $payload['tokens'] = array();
+				$payload['tokens']['pinterest_access_token'] = $pinterest_token;
+			}
+		} else {
+			if ( ! empty( $capi_token ) || ! empty( $snapchat_token ) || ! empty( $pinterest_token ) ) {
+				self::log( 'warning', 'Sensitive API tokens not sent to non-HTTPS GTM endpoint. Use HTTPS to enable token forwarding.' );
+			}
 		}
 		
 		$args = array(
