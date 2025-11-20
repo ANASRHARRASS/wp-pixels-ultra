@@ -1,0 +1,10 @@
+name: Ultra Pixels CodeQL
+disable-default-queries: false
+queries:
+  - uses: security-and-quality
+paths:
+  - assets
+paths-ignore:
+  - node_modules
+  - vendor
+  - dist

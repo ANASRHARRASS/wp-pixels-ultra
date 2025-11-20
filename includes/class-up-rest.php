@@ -3,11 +3,12 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 class UP_REST {
     public static function register_routes() {
-        register_rest_route( 'up/v1', '/ingest', array(
-            'methods' => 'POST',
-            'callback' => array( __CLASS__, 'ingest' ),
-            'permission_callback' => '__return_true',
-        ) );
+        // NOTE: /ingest route moved to class-up-rest-ingest.php for GTM forwarder
+        // register_rest_route( 'up/v1', '/ingest', array(
+        //     'methods' => 'POST',
+        //     'callback' => array( __CLASS__, 'ingest' ),
+        //     'permission_callback' => '__return_true',
+        // ) );
 
         register_rest_route( 'up/v1', '/test', array(
             'methods' => 'POST',
@@ -194,11 +195,16 @@ class UP_REST {
         $platform = isset( $payload['platform'] ) ? sanitize_text_field( $payload['platform'] ) : 'generic';
         $event_name = isset( $payload['event_name'] ) ? sanitize_text_field( $payload['event_name'] ) : ( isset( $payload['event'] ) ? sanitize_text_field( $payload['event'] ) : 'event' );
 
+        // Accept optional client-supplied event_id (sanitized) for idempotency
+        if ( isset( $payload['event_id'] ) && is_string( $payload['event_id'] ) ) {
+            $payload['event_id'] = substr( sanitize_text_field( $payload['event_id'] ), 0, 64 );
+        }
+
         // Enqueue event for async processing using UP_CAPI
         if ( class_exists( 'UP_CAPI' ) && method_exists( 'UP_CAPI', 'enqueue_event' ) ) {
             $ok = UP_CAPI::enqueue_event( $platform, $event_name, $payload );
             if ( $ok ) {
-                return new WP_REST_Response( array( 'ok' => true, 'queued' => true ), 202 );
+                return new WP_REST_Response( array( 'ok' => true, 'queued' => true, 'event_id' => isset( $payload['event_id'] ) ? $payload['event_id'] : null ), 202 );
             }
             return new WP_REST_Response( array( 'ok' => false, 'error' => 'enqueue_failed' ), 500 );
         }

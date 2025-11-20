@@ -1,0 +1,11 @@
+includesAutoloading: false
+parameters:
+  level: 4
+  paths:
+    - includes
+  excludePaths:
+    - vendor
+  checkMissingIterableValueType: false
+  reportUnmatchedIgnoredErrors: false
+  memoryLimit: 256M
+  tmpDir: build/phpstan
