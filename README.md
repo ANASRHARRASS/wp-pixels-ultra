@@ -211,6 +211,16 @@ The GTM Server Forwarder routes all server-side events through your GTM server-s
 - No events are lost during configuration changes
 
 ## Usage
+### WSL Developer Environment
+For a fast, repeatable Linux dev setup (PHP 8.2, Composer, Node 18, static analysis), run the bootstrap script after pulling latest:
+
+```bash
+git pull origin chore/codeql-resigned
+bash tools/setup-wsl.sh
+```
+
+The script is idempotent and will install missing dependencies, build assets, and run PHPStan/PHPCS. See comments inside `tools/setup-wsl.sh` for details.
+
 
 ### Landing Page Examples
 ```html
