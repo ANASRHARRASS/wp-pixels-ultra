@@ -10,6 +10,11 @@
         "wp-coding-standards/wpcs": "^3.0",
         "dealerdirect/phpcodesniffer-composer-installer": "^1.0"
     },
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        }
+    },
     "scripts": {
         "phpstan": "phpstan analyse --configuration=phpstan.neon.dist --no-progress",
         "phpcs": "phpcs --standard=phpcs.xml",

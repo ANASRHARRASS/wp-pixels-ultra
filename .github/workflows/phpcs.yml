@@ -18,6 +18,8 @@ jobs:
           php-version: '8.2'
           tools: composer
           coverage: none
+      - name: Set composer allow-plugins for phpcs installer
+        run: composer config --no-interaction allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
       - name: Install Dependencies
         run: composer install --no-interaction --prefer-dist
       - name: Run PHPCS

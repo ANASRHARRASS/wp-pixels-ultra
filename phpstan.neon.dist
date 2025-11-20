@@ -1,4 +1,3 @@
-includesAutoloading: false
 parameters:
   level: 4
   paths:

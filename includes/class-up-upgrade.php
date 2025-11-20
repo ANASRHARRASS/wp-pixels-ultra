@@ -22,19 +22,19 @@ class UP_Upgrade {
             return; // fresh install handled in activation
         }
         // check if column already exists
-        $col = $wpdb->get_results( "SHOW COLUMNS FROM {$table} LIKE 'event_id'" );
+        $col = $wpdb->get_results( "SHOW COLUMNS FROM `" . esc_sql( $table ) . "` LIKE 'event_id'" );
         if ( empty( $col ) ) {
-            $wpdb->query( "ALTER TABLE {$table} ADD COLUMN event_id VARCHAR(64) NOT NULL DEFAULT ''" );
+            $wpdb->query( "ALTER TABLE `" . esc_sql( $table ) . "` ADD COLUMN event_id VARCHAR(64) NOT NULL DEFAULT ''" );
             // add unique index
-            $wpdb->query( "ALTER TABLE {$table} ADD UNIQUE INDEX event_id (event_id)" );
+            $wpdb->query( "ALTER TABLE `" . esc_sql( $table ) . "` ADD UNIQUE INDEX `event_id` (`event_id`)" );
             // backfill event_id values for existing rows in small batches
             $batch = 500;
             $offset = 0;
             while ( true ) {
-                $rows = $wpdb->get_results( $wpdb->prepare( "SELECT id, platform, event_name, payload, created_at FROM {$table} ORDER BY id ASC LIMIT %d OFFSET %d", $batch, $offset ), ARRAY_A );
+                $rows = $wpdb->get_results( $wpdb->prepare( "SELECT id, platform, event_name, payload, created_at, event_id FROM `" . esc_sql( $table ) . "` ORDER BY id ASC LIMIT %d OFFSET %d", $batch, $offset ), ARRAY_A );
                 if ( empty( $rows ) ) break;
                 foreach ( $rows as $r ) {
-                    if ( ! empty( $r['event_id'] ) ) continue; // skip if already set
+                    if ( isset( $r['event_id'] ) && $r['event_id'] !== '' ) continue; // skip if already set
                     $payload = json_decode( $r['payload'], true );
                     $event_id = self::derive_event_id( $r['platform'], $r['event_name'], $payload, $r['created_at'] );
                     $wpdb->update( $table, array( 'event_id' => $event_id ), array( 'id' => $r['id'] ), array( '%s' ), array( '%d' ) );
