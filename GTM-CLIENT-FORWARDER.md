@@ -271,7 +271,7 @@ The `UP_GTM_FORWARD()` function accepts this payload structure:
 ```
 
 **Important Notes:**
-- **PII Handling**: Send raw email/phone in `user_data`. The forwarder script removes them before sending to WordPress, and the WordPress plugin handles proper hashing server-side.
+- **PII Handling**: By default, the forwarder removes raw email/phone from `user_data` before sending to WordPress, so no PII leaves the browser. If raw PII reaches the server from other clients/integrations, the plugin hashes it server-side on ingest.
 - **Event IDs**: Use deterministic IDs for purchases (`order_{{Order ID}}`) to enable proper deduplication between client and server events.
 - **Platform Names**: Use lowercase platform identifiers: `meta`, `tiktok`, `google_ads`, `snapchat`, `pinterest`.
 
@@ -445,9 +445,9 @@ Respect user consent before forwarding:
    - Use unique random IDs for other events: `ev_{{Timestamp}}_{{Random}}`
 
 2. **PII Handling**
-   - Always send raw PII (email, phone) from GTM
-   - Never hash PII client-side
-   - Let WordPress plugin handle server-side hashing
+  - Prefer not sending raw PII from the browser; the forwarder strips it by default
+  - Do not pre-hash PII client-side; if raw PII is present, the server will hash at ingest
+  - Ensure compliance with your consent policy before including user identifiers
 
 3. **Error Handling**
    - Wrap forwarding calls in try-catch

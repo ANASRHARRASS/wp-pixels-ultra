@@ -45,7 +45,7 @@ class UP_Loader {
                 // Enqueue GTM forwarder script for client-side GTM integration
                 wp_enqueue_script( 'up-gtm-forwarder', UP_PLUGIN_URL . 'assets/up-gtm-forwarder.js', array(), defined( 'UP_VERSION' ) ? UP_VERSION : false, true );
                 
-                wp_localize_script( 'up-gtm-forwarder', 'UP_CONFIG', array(
+                $up_config = array(
                     'ingest_url' => esc_url_raw( rest_url( 'up/v1/ingest' ) ),
                     'wp_nonce'   => wp_create_nonce( 'wp_rest' ),
                     'gtm_id'     => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'gtm_container_id', '' ) : '',
@@ -57,7 +57,10 @@ class UP_Loader {
                     'pinterest_tag_id' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'pinterest_tag_id', '' ) : '',
                     'gtm_manage_pixels' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'gtm_manage_pixels', 'no' ) === 'yes' : false,
                     // NOTE: server_secret is intentionally NOT exposed to client-side.
-                ) );
+                );
+                // Localize config to both scripts for backward compatibility
+                wp_localize_script( 'up-gtm-forwarder', 'UP_CONFIG', $up_config );
+                wp_localize_script( 'up-pixel-loader', 'UP_CONFIG', $up_config );
             }
         } );
 
