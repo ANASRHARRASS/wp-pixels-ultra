@@ -1,4 +1,5 @@
 parameters:
+  tmpDir: build/phpstan
   level: 4
   paths:
     - includes
@@ -6,5 +7,3 @@ parameters:
     - vendor
   checkMissingIterableValueType: false
   reportUnmatchedIgnoredErrors: false
-  memoryLimit: 256M
-  tmpDir: build/phpstan
