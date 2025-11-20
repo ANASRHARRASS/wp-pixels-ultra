@@ -456,7 +456,7 @@ Respect user consent before forwarding:
 
 4. **Performance**
    - Use `keepalive: true` for reliable delivery during navigation
-   - Consider using `sendBeacon` for page unload events
+   - *Note: `sendBeacon` cannot be used because it does not support custom headers (e.g., `X-WP-Nonce` required for authentication).*
    - Batch similar events when possible
 
 5. **Testing**
