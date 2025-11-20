@@ -4,9 +4,6 @@
   <rule ref="WordPress" />
   <rule ref="WordPress-Extra" />
   <rule ref="WordPress-Docs" />
-  <!-- Default target directories/files -->
-  <file>includes</file>
-  <file>wp-pixels-ultra.php</file>
   <exclude-pattern>vendor/*</exclude-pattern>
   <exclude-pattern>assets/*</exclude-pattern>
   <arg name="parallel" value="8" />
