@@ -301,7 +301,7 @@ class UP_Settings {
                                 <option value="no" <?php selected( $opts['use_gtm_forwarder'], 'no' ); ?>>No</option>
                                 <option value="yes" <?php selected( $opts['use_gtm_forwarder'], 'yes' ); ?>>Yes</option>
                             </select>
-                            <p class="description">When enabled, all server-side events are forwarded to GTM Server Container instead of directly calling platform APIs. Requires GTM Server Container URL to be configured.</p>
+                            <p class="description">When enabled, queued events are forwarded to GTM Server Container instead of directly calling platform APIs when processed in batches. Requires GTM Server Container URL to be configured.</p>
                         </td>
                     </tr>
                     <tr>
