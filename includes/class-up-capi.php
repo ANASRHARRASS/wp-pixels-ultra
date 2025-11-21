@@ -14,9 +14,9 @@ class UP_CAPI {
 		if ( is_array( $payload ) && isset( $payload['event_id'] ) && is_string( $payload['event_id'] ) ) {
 			$provided_id = substr( sanitize_text_field( $payload['event_id'] ), 0, 64 );
 		}
-		$event_id = $provided_id ? $provided_id : ( class_exists( 'UP_Upgrade' ) ? UP_Upgrade::derive_event_id( $platform, $event_name, $payload ) : substr( hash( 'sha256', $platform . '|' . $event_name . '|' . $now ), 0, 32 ) );
+		$event_id = $provided_id ? $provided_id : ( class_exists( 'UP_Upgrade' ) ? UP_Upgrade::derive_event_id( $platform, $event_name, $payload ) : substr( hash( 'sha256', $platform . '|' . $event_name . '|' . wp_json_encode( $payload ) ), 0, 32 ) );
 		// skip insert if duplicate event_id already present (idempotent)
-		$dupe = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM `" . esc_sql( $table ) . "` WHERE event_id = %s LIMIT 1", $event_id ) );
+		$dupe = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM `{$table}` WHERE event_id = %s LIMIT 1", $event_id ) );
 		if ( $dupe ) {
 			return true; // treat as success, already queued
 		}
@@ -53,7 +53,7 @@ class UP_CAPI {
 		$now = time();
 
 		// select eligible rows
-		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM `" . esc_sql( $table ) . "` WHERE (next_attempt = 0 OR next_attempt <= %d) ORDER BY created_at ASC LIMIT %d", $now, $limit ), ARRAY_A );
+		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM `{$table}` WHERE (next_attempt = 0 OR next_attempt <= %d) ORDER BY created_at ASC LIMIT %d", $now, $limit ), ARRAY_A );
 		if ( empty( $rows ) ) return 0;
 		$processed = 0;
 		// Group rows by platform for batch sending
@@ -118,7 +118,7 @@ class UP_CAPI {
 		// record last processed time
 		update_option( 'up_capi_last_processed', $now );
 		// reschedule if work likely remains
-		$remaining = $wpdb->get_var( "SELECT COUNT(1) FROM `" . esc_sql( $table ) . "`" );
+		$remaining = $wpdb->get_var( "SELECT COUNT(1) FROM `{$table}`" );
 		if ( $remaining && intval( $remaining ) > 0 ) {
 			// prefer Action Scheduler if available
 			if ( function_exists( 'as_schedule_single_action' ) ) {
@@ -136,7 +136,7 @@ class UP_CAPI {
 	public static function get_queue_length() {
 		global $wpdb;
 		$table = $wpdb->prefix . 'up_capi_queue';
-		$cnt = $wpdb->get_var( "SELECT COUNT(1) FROM `" . esc_sql( $table ) . "`" );
+		$cnt = $wpdb->get_var( "SELECT COUNT(1) FROM `{$table}`" );
 		return intval( $cnt );
 	}
 
@@ -144,7 +144,7 @@ class UP_CAPI {
 	public static function list_queue( $limit = 20, $offset = 0 ) {
 		global $wpdb;
 		$table = $wpdb->prefix . 'up_capi_queue';
-		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM `" . esc_sql( $table ) . "` ORDER BY created_at DESC LIMIT %d OFFSET %d", intval( $limit ), intval( $offset ) ), ARRAY_A );
+		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM `{$table}` ORDER BY created_at DESC LIMIT %d OFFSET %d", intval( $limit ), intval( $offset ) ), ARRAY_A );
 		foreach ( $rows as &$r ) {
 			$r['payload'] = json_decode( $r['payload'], true );
 		}
@@ -169,7 +169,7 @@ class UP_CAPI {
 	public static function list_deadletter( $limit = 20, $offset = 0 ) {
 		global $wpdb;
 		$table = $wpdb->prefix . 'up_capi_deadletter';
-		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM `" . esc_sql( $table ) . "` ORDER BY failed_at DESC LIMIT %d OFFSET %d", intval( $limit ), intval( $offset ) ), ARRAY_A );
+		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM `{$table}` ORDER BY failed_at DESC LIMIT %d OFFSET %d", intval( $limit ), intval( $offset ) ), ARRAY_A );
 		foreach ( $rows as &$r ) {
 			$r['payload'] = json_decode( $r['payload'], true );
 		}
@@ -184,14 +184,17 @@ class UP_CAPI {
 		$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$dl_table} WHERE id = %d", intval( $id ) ), ARRAY_A );
 		if ( ! $row ) return false;
 		$now = time();
+		// Generate event_id for retry (use platform + event_name + timestamp for uniqueness)
+		$event_id = substr( hash( 'sha256', $row['platform'] . '|' . $row['event_name'] . '|' . $now ), 0, 32 );
 		$inserted = $wpdb->insert( $table, array(
+			'event_id' => $event_id,
 			'platform' => substr( (string) $row['platform'], 0, 50 ),
 			'event_name' => substr( (string) $row['event_name'], 0, 191 ),
 			'payload' => $row['payload'],
 			'attempts' => 0,
 			'next_attempt' => 0,
 			'created_at' => $now,
-		), array( '%s', '%s', '%s', '%d', '%d', '%d' ) );
+		), array( '%s', '%s', '%s', '%s', '%d', '%d', '%d' ) );
 		if ( $inserted ) {
 			$wpdb->delete( $dl_table, array( 'id' => intval( $id ) ), array( '%d' ) );
 			return true;
@@ -626,7 +629,8 @@ class UP_CAPI {
 			}
 		} else {
 			if ( ! empty( $capi_token ) || ! empty( $snapchat_token ) || ! empty( $pinterest_token ) ) {
-				self::log( 'warning', 'Sensitive API tokens not sent to non-HTTPS GTM endpoint. Use HTTPS to enable token forwarding.' );
+				self::log( 'error', 'GTM forwarder requires HTTPS endpoint. Refusing to send tokens over insecure connection.' );
+				return new WP_Error( 'insecure_endpoint', 'GTM Server Container URL must use HTTPS.' );
 			}
 		}
 		

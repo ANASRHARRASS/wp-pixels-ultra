@@ -58,9 +58,8 @@ class UP_Loader {
                     'gtm_manage_pixels' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'gtm_manage_pixels', 'no' ) === 'yes' : false,
                     // NOTE: server_secret is intentionally NOT exposed to client-side.
                 );
-                // Localize config to both scripts for backward compatibility
+                // Localize config to GTM forwarder only; both scripts can access window.UP_CONFIG
                 wp_localize_script( 'up-gtm-forwarder', 'UP_CONFIG', $up_config );
-                wp_localize_script( 'up-pixel-loader', 'UP_CONFIG', $up_config );
             }
         } );
 

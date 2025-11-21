@@ -94,13 +94,13 @@ class UP_REST_Ingest {
         if ( empty( $params['event'] ) && empty( $params['event_name'] ) ) {
             return new WP_Error( 'missing_event_name', __( 'event or event_name is required.' ), array( 'status' => 400 ) );
         }
-        $event = sanitize_text_field( wp_unslash( $params['event'] ?? $params['event_name'] ) );
+        $event = sanitize_text_field( $params['event'] ?? $params['event_name'] );
 
         // Generate a unique event_id if not provided, for backward compatibility
         if ( empty( $params['event_id'] ) ) {
             $event_id = function_exists( 'wp_generate_uuid4' ) ? wp_generate_uuid4() : substr( hash( 'sha256', uniqid( '', true ) ), 0, 32 );
         } else {
-            $event_id = sanitize_text_field( wp_unslash( $params['event_id'] ) );
+            $event_id = sanitize_text_field( $params['event_id'] );
         }
 
         // custom_data is optional; default to empty array if not provided
@@ -125,7 +125,7 @@ class UP_REST_Ingest {
             $clean_ud = array();
             foreach ( $user_data as $k => $v ) {
                 if ( in_array( $k, array( 'email', 'phone', 'phone_number' ), true ) && is_string( $v ) ) {
-                    $val = strtolower( trim( wp_unslash( $v ) ) );
+                    $val = strtolower( trim( $v ) );
                     if ( $k === 'email' ) $clean_ud['email_hash'] = hash( 'sha256', $val );
                     else $clean_ud['phone_hash'] = hash( 'sha256', preg_replace( '/\D+/', '', $val ) );
                 } else {
@@ -165,7 +165,11 @@ class UP_REST_Ingest {
         if ( class_exists( 'UP_CAPI' ) && method_exists( 'UP_CAPI', 'enqueue_event' ) ) {
             try {
                 $platform = isset( $params['platform'] ) ? sanitize_text_field( $params['platform'] ) : 'generic';
-                UP_CAPI::enqueue_event( $platform, $event, $validated_payload );
+                $result = UP_CAPI::enqueue_event( $platform, $event, $validated_payload );
+                if ( ! $result ) {
+                    error_log( '[UP_REST_Ingest] enqueue_event returned false' );
+                    return new WP_Error( 'enqueue_failed', __( 'Failed to enqueue event.' ), array( 'status' => 500 ) );
+                }
             } catch ( Throwable $e ) {
                 error_log( '[UP_REST_Ingest] enqueue_event exception: ' . $e->getMessage() );
                 return new WP_Error( 'enqueue_failed', __( 'Failed to enqueue event.' ), array( 'status' => 500 ) );
@@ -195,7 +199,7 @@ class UP_REST_Ingest {
         }
         if ( is_bool( $data ) ) return $data;
         if ( is_numeric( $data ) ) return $data + 0;
-        if ( is_string( $data ) ) return sanitize_text_field( wp_unslash( $data ) );
+        if ( is_string( $data ) ) return sanitize_text_field( $data );
         return sanitize_text_field( wp_json_encode( $data ) );
     }
 
