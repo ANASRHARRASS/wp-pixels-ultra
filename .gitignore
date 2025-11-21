@@ -12,6 +12,9 @@ dist/
 .env.local
 .env.*.local
 
+# Secret detection
+.secrets.baseline
+
 # IDE
 .vscode/
 .idea/
