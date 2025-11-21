@@ -14,7 +14,15 @@ class UP_CAPI {
 		if ( is_array( $payload ) && isset( $payload['event_id'] ) && is_string( $payload['event_id'] ) ) {
 			$provided_id = substr( sanitize_text_field( $payload['event_id'] ), 0, 64 );
 		}
-		$event_id = $provided_id ? $provided_id : ( class_exists( 'UP_Upgrade' ) ? UP_Upgrade::derive_event_id( $platform, $event_name, $payload ) : substr( hash( 'sha256', $platform . '|' . $event_name . '|' . wp_json_encode( $payload ) ), 0, 32 ) );
+		
+		if ( $provided_id ) {
+			$event_id = $provided_id;
+		} elseif ( class_exists( 'UP_Upgrade' ) ) {
+			$event_id = UP_Upgrade::derive_event_id( $platform, $event_name, $payload );
+		} else {
+			// Fallback: deterministic hash based on event data
+			$event_id = substr( hash( 'sha256', $platform . '|' . $event_name . '|' . wp_json_encode( $payload ) ), 0, 32 );
+		}
 		// skip insert if duplicate event_id already present (idempotent)
 		$dupe = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM `{$table}` WHERE event_id = %s LIMIT 1", $event_id ) );
 		if ( $dupe ) {
@@ -184,8 +192,8 @@ class UP_CAPI {
 		$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$dl_table} WHERE id = %d", intval( $id ) ), ARRAY_A );
 		if ( ! $row ) return false;
 		$now = time();
-		// Generate event_id for retry (use platform + event_name + timestamp for uniqueness)
-		$event_id = substr( hash( 'sha256', $row['platform'] . '|' . $row['event_name'] . '|' . $now ), 0, 32 );
+		// Generate unique event_id for retry (include deadletter ID to ensure uniqueness)
+		$event_id = function_exists( 'wp_generate_uuid4' ) ? wp_generate_uuid4() : substr( hash( 'sha256', 'retry|' . $id . '|' . $now ), 0, 32 );
 		$inserted = $wpdb->insert( $table, array(
 			'event_id' => $event_id,
 			'platform' => substr( (string) $row['platform'], 0, 50 ),
