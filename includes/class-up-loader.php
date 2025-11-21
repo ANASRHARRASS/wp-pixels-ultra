@@ -14,7 +14,7 @@ class UP_Loader {
             'file' => 'class-up-events.php',
         );
         // include if present
-        foreach ( array( 'class-up-settings.php', 'class-up-admin.php', 'class-up-front.php', 'class-up-capi.php', 'class-up-events.php', 'class-up-elementor.php' ) as $f ) {
+        foreach ( array( 'class-up-settings.php', 'class-up-admin.php', 'class-up-front.php', 'class-up-capi.php', 'class-up-events.php', 'class-up-elementor.php', 'class-up-rest-ingest.php', 'class-up-upgrade.php' ) as $f ) {
             $path = $inc_dir . $f;
             if ( file_exists( $path ) ) {
                 require_once $path;
@@ -41,9 +41,13 @@ class UP_Loader {
             if ( defined( 'UP_PLUGIN_URL' ) ) {
                 // use the canonical assets path inside the plugin
                 wp_enqueue_script( 'up-pixel-loader', UP_PLUGIN_URL . 'assets/pixel-loader.js', array(), defined( 'UP_VERSION' ) ? UP_VERSION : false, true );
-                wp_localize_script( 'up-pixel-loader', 'UP_CONFIG', array(
+                
+                // Enqueue GTM forwarder script for client-side GTM integration
+                wp_enqueue_script( 'up-gtm-forwarder', UP_PLUGIN_URL . 'assets/up-gtm-forwarder.js', array(), defined( 'UP_VERSION' ) ? UP_VERSION : false, true );
+                
+                $up_config = array(
                     'ingest_url' => esc_url_raw( rest_url( 'up/v1/ingest' ) ),
-                    'nonce'      => wp_create_nonce( 'wp_rest' ),
+                    'wp_nonce'   => wp_create_nonce( 'wp_rest' ),
                     'gtm_id'     => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'gtm_container_id', '' ) : '',
                     'gtm_server_url' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'gtm_server_url', '' ) : '',
                     'meta_pixel_id' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'meta_pixel_id', '' ) : '',
@@ -53,7 +57,9 @@ class UP_Loader {
                     'pinterest_tag_id' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'pinterest_tag_id', '' ) : '',
                     'gtm_manage_pixels' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'gtm_manage_pixels', 'no' ) === 'yes' : false,
                     // NOTE: server_secret is intentionally NOT exposed to client-side.
-                ) );
+                );
+                // Localize config to GTM forwarder only; both scripts can access window.UP_CONFIG
+                wp_localize_script( 'up-gtm-forwarder', 'UP_CONFIG', $up_config );
             }
         } );
 
@@ -68,9 +74,17 @@ class UP_Loader {
             UP_Elementor::init();
         }
 
+        // run DB upgrades if available
+        if ( class_exists( 'UP_Upgrade' ) ) {
+            UP_Upgrade::maybe_run();
+        }
         // register WP REST routes if a REST helper exists
         if ( class_exists( 'UP_REST' ) ) {
             add_action( 'rest_api_init', array( 'UP_REST', 'register_routes' ) );
+        }
+        // initialize dedicated ingest routes
+        if ( class_exists( 'UP_REST_Ingest' ) ) {
+            UP_REST_Ingest::init();
         }
         // schedule/process CAPI queue via WP-Cron
         if ( class_exists( 'UP_CAPI' ) ) {

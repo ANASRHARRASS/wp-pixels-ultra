@@ -1,0 +1,51 @@
+name: PHP Syntax
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 3 * * 0'
+
+jobs:
+  lint:
+    name: Lint (PHP ${{ matrix.php }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: [ '8.1', '8.2' ]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+
+      - name: Display PHP Version
+        run: php -v
+
+      - name: Syntax Lint (php -l)
+        run: |
+          set -e
+          echo "Scanning PHP syntax..."
+          # Find all PHP files excluding potential vendor directory
+          FILES=$(find . -type f -name '*.php' ! -path './vendor/*')
+          FAILED=0
+          for f in $FILES; do
+            php -l "$f" || FAILED=1
+          done
+          if [ "$FAILED" -ne 0 ]; then
+            echo 'One or more files have syntax errors.'
+            exit 1
+          fi
+          echo 'No syntax errors detected.'
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "PHP syntax check completed for version ${{ matrix.php }}"

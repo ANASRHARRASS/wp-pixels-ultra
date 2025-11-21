@@ -9,14 +9,34 @@ class UP_CAPI {
 		global $wpdb;
 		$table = $wpdb->prefix . 'up_capi_queue';
 		$now = time();
+		// derive deterministic event_id; allow provided event_id override
+		$provided_id = '';
+		if ( is_array( $payload ) && isset( $payload['event_id'] ) && is_string( $payload['event_id'] ) ) {
+			$provided_id = substr( sanitize_text_field( $payload['event_id'] ), 0, 64 );
+		}
+		
+		if ( $provided_id ) {
+			$event_id = $provided_id;
+		} elseif ( class_exists( 'UP_Upgrade' ) ) {
+			$event_id = UP_Upgrade::derive_event_id( $platform, $event_name, $payload );
+		} else {
+			// Fallback: deterministic hash based on event data
+			$event_id = substr( hash( 'sha256', $platform . '|' . $event_name . '|' . wp_json_encode( $payload ) ), 0, 32 );
+		}
+		// skip insert if duplicate event_id already present (idempotent)
+		$dupe = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM `{$table}` WHERE event_id = %s LIMIT 1", $event_id ) );
+		if ( $dupe ) {
+			return true; // treat as success, already queued
+		}
 		$inserted = $wpdb->insert( $table, array(
+			'event_id' => $event_id,
 			'platform' => substr( (string) $platform, 0, 50 ),
 			'event_name' => substr( (string) $event_name, 0, 191 ),
 			'payload' => wp_json_encode( $payload ),
 			'attempts' => 0,
 			'next_attempt' => 0,
 			'created_at' => $now,
-		), array( '%s', '%s', '%s', '%d', '%d', '%d' ) );
+		), array( '%s', '%s', '%s', '%s', '%d', '%d', '%d' ) );
 
 		if ( $inserted ) {
 			// Prefer Action Scheduler if available for reliable background processing
@@ -41,7 +61,7 @@ class UP_CAPI {
 		$now = time();
 
 		// select eligible rows
-		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} WHERE (next_attempt = 0 OR next_attempt <= %d) ORDER BY created_at ASC LIMIT %d", $now, $limit ), ARRAY_A );
+		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM `{$table}` WHERE (next_attempt = 0 OR next_attempt <= %d) ORDER BY created_at ASC LIMIT %d", $now, $limit ), ARRAY_A );
 		if ( empty( $rows ) ) return 0;
 		$processed = 0;
 		// Group rows by platform for batch sending
@@ -106,7 +126,7 @@ class UP_CAPI {
 		// record last processed time
 		update_option( 'up_capi_last_processed', $now );
 		// reschedule if work likely remains
-		$remaining = $wpdb->get_var( "SELECT COUNT(1) FROM {$table}" );
+		$remaining = $wpdb->get_var( "SELECT COUNT(1) FROM `{$table}`" );
 		if ( $remaining && intval( $remaining ) > 0 ) {
 			// prefer Action Scheduler if available
 			if ( function_exists( 'as_schedule_single_action' ) ) {
@@ -124,7 +144,7 @@ class UP_CAPI {
 	public static function get_queue_length() {
 		global $wpdb;
 		$table = $wpdb->prefix . 'up_capi_queue';
-		$cnt = $wpdb->get_var( "SELECT COUNT(1) FROM {$table}" );
+		$cnt = $wpdb->get_var( "SELECT COUNT(1) FROM `{$table}`" );
 		return intval( $cnt );
 	}
 
@@ -132,7 +152,7 @@ class UP_CAPI {
 	public static function list_queue( $limit = 20, $offset = 0 ) {
 		global $wpdb;
 		$table = $wpdb->prefix . 'up_capi_queue';
-		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} ORDER BY created_at DESC LIMIT %d OFFSET %d", intval( $limit ), intval( $offset ) ), ARRAY_A );
+		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM `{$table}` ORDER BY created_at DESC LIMIT %d OFFSET %d", intval( $limit ), intval( $offset ) ), ARRAY_A );
 		foreach ( $rows as &$r ) {
 			$r['payload'] = json_decode( $r['payload'], true );
 		}
@@ -157,7 +177,7 @@ class UP_CAPI {
 	public static function list_deadletter( $limit = 20, $offset = 0 ) {
 		global $wpdb;
 		$table = $wpdb->prefix . 'up_capi_deadletter';
-		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} ORDER BY failed_at DESC LIMIT %d OFFSET %d", intval( $limit ), intval( $offset ) ), ARRAY_A );
+		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM `{$table}` ORDER BY failed_at DESC LIMIT %d OFFSET %d", intval( $limit ), intval( $offset ) ), ARRAY_A );
 		foreach ( $rows as &$r ) {
 			$r['payload'] = json_decode( $r['payload'], true );
 		}
@@ -172,14 +192,17 @@ class UP_CAPI {
 		$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$dl_table} WHERE id = %d", intval( $id ) ), ARRAY_A );
 		if ( ! $row ) return false;
 		$now = time();
+		// Generate unique event_id for retry (include deadletter ID to ensure uniqueness)
+		$event_id = function_exists( 'wp_generate_uuid4' ) ? wp_generate_uuid4() : substr( hash( 'sha256', 'retry|' . $id . '|' . $now ), 0, 32 );
 		$inserted = $wpdb->insert( $table, array(
+			'event_id' => $event_id,
 			'platform' => substr( (string) $row['platform'], 0, 50 ),
 			'event_name' => substr( (string) $row['event_name'], 0, 191 ),
 			'payload' => $row['payload'],
 			'attempts' => 0,
 			'next_attempt' => 0,
 			'created_at' => $now,
-		), array( '%s', '%s', '%s', '%d', '%d', '%d' ) );
+		), array( '%s', '%s', '%s', '%s', '%d', '%d', '%d' ) );
 		if ( $inserted ) {
 			$wpdb->delete( $dl_table, array( 'id' => intval( $id ) ), array( '%d' ) );
 			return true;
@@ -269,6 +292,16 @@ class UP_CAPI {
 	 */
 	protected static function send_batch( $platform, $events = array() ) {
 		if ( empty( $events ) ) return new WP_Error( 'no_events', 'No events to send' );
+		
+		// Check if GTM forwarder is enabled
+		$use_gtm_forwarder = UP_Settings::get( 'use_gtm_forwarder', 'no' ) === 'yes';
+		
+		if ( $use_gtm_forwarder ) {
+			// Route all events through GTM Server Container
+			return self::send_to_gtm_server( $platform, $events, true );
+		}
+		
+		// Original platform-specific routing
 		$token = UP_Settings::get( 'capi_token', '' );
 		$meta_id = UP_Settings::get( 'meta_pixel_id', '' );
 		$tiktok_id = UP_Settings::get( 'tiktok_pixel_id', '' );
@@ -539,6 +572,100 @@ class UP_CAPI {
 		);
 		$response = wp_remote_post( $url, $args );
 		if ( is_wp_error( $response ) ) self::log( 'error', 'Pinterest send error: ' . $response->get_error_message() );
+		return $response;
+	}
+
+	/**
+	 * Send events to GTM Server Container for unified routing
+	 * 
+	 * @param string $platform Platform identifier (meta, tiktok, google_ads, etc.)
+	 * @param array $events Array of event payloads
+	 * @param bool $blocking Whether to wait for response
+	 * @return array|WP_Error Response from GTM server
+	 */
+	protected static function send_to_gtm_server( $platform, $events = array(), $blocking = true ) {
+		$gtm_server_url = UP_Settings::get( 'gtm_server_url', '' );
+		
+		if ( empty( $gtm_server_url ) ) {
+			self::log( 'error', 'GTM forwarder enabled but gtm_server_url not configured' );
+			return new WP_Error( 'gtm_not_configured', 'GTM Server Container URL is required for GTM forwarding.' );
+		}
+		
+		// Build the endpoint URL - use a standard path for event ingestion
+		$endpoint = trailingslashit( $gtm_server_url ) . 'event';
+		
+		// Get platform-specific IDs for forwarding to GTM
+		$pixel_ids = array(
+			'meta_pixel_id' => UP_Settings::get( 'meta_pixel_id', '' ),
+			'tiktok_pixel_id' => UP_Settings::get( 'tiktok_pixel_id', '' ),
+			'google_ads_id' => UP_Settings::get( 'google_ads_id', '' ),
+			'google_ads_label' => UP_Settings::get( 'google_ads_label', '' ),
+			'snapchat_pixel_id' => UP_Settings::get( 'snapchat_pixel_id', '' ),
+			'pinterest_tag_id' => UP_Settings::get( 'pinterest_tag_id', '' ),
+		);
+		
+		// Prepare batch payload for GTM server
+		$payload = array(
+			'platform' => $platform,
+			'events' => $events,
+			'pixel_ids' => $pixel_ids,
+			'source' => 'wordpress',
+			'site_url' => home_url(),
+			'timestamp' => time(),
+		);
+		
+		// Optional: include tokens only to secure endpoints (HTTPS)
+		$capi_token = UP_Settings::get( 'capi_token', '' );
+		$snapchat_token = UP_Settings::get( 'snapchat_api_token', '' );
+		$pinterest_token = UP_Settings::get( 'pinterest_access_token', '' );
+		$endpoint_scheme = '';
+		$parsed = parse_url( $endpoint );
+		if ( is_array( $parsed ) && isset( $parsed['scheme'] ) ) {
+			$endpoint_scheme = strtolower( $parsed['scheme'] );
+		}
+		if ( $endpoint_scheme === 'https' ) {
+			if ( ! empty( $capi_token ) ) {
+				$payload['tokens'] = array( 'capi_token' => $capi_token );
+			}
+			if ( ! empty( $snapchat_token ) ) {
+				if ( ! isset( $payload['tokens'] ) ) $payload['tokens'] = array();
+				$payload['tokens']['snapchat_api_token'] = $snapchat_token;
+			}
+			if ( ! empty( $pinterest_token ) ) {
+				if ( ! isset( $payload['tokens'] ) ) $payload['tokens'] = array();
+				$payload['tokens']['pinterest_access_token'] = $pinterest_token;
+			}
+		} else {
+			if ( ! empty( $capi_token ) || ! empty( $snapchat_token ) || ! empty( $pinterest_token ) ) {
+				self::log( 'error', 'GTM forwarder requires HTTPS endpoint. Refusing to send tokens over insecure connection.' );
+				return new WP_Error( 'insecure_endpoint', 'GTM Server Container URL must use HTTPS.' );
+			}
+		}
+		
+		$args = array(
+			'timeout' => 20,
+			'headers' => array(
+				'Content-Type' => 'application/json',
+				'Accept' => 'application/json',
+				'User-Agent' => 'WordPress-UltraPixels/' . ( defined( 'UP_VERSION' ) ? UP_VERSION : '1.0' ),
+			),
+			'body' => wp_json_encode( $payload ),
+			'blocking' => (bool) $blocking,
+		);
+		
+		$response = wp_remote_post( $endpoint, $args );
+		
+		if ( is_wp_error( $response ) ) {
+			self::log( 'error', sprintf( 'GTM forwarder error (%s): %s', $platform, $response->get_error_message() ) );
+		} elseif ( is_array( $response ) && isset( $response['response']['code'] ) ) {
+			$code = intval( $response['response']['code'] );
+			if ( $code >= 200 && $code < 300 ) {
+				self::log( 'info', sprintf( 'GTM forwarded %d events for platform %s (HTTP %d)', count( $events ), $platform, $code ) );
+			} else {
+				self::log( 'error', sprintf( 'GTM forwarder HTTP %d for platform %s', $code, $platform ) );
+			}
+		}
+		
 		return $response;
 	}
 

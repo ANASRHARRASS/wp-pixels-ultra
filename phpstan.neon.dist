@@ -1,0 +1,9 @@
+parameters:
+  tmpDir: build/phpstan
+  level: 4
+  paths:
+    - includes
+  excludePaths:
+    - vendor
+  checkMissingIterableValueType: false
+  reportUnmatchedIgnoredErrors: false
