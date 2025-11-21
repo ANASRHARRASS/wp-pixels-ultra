@@ -6,15 +6,8 @@ class UP_Loader {
         $inc_dir = UP_PLUGIN_DIR . 'includes/';
 
         // core files (safe include)
-        $files = array(
-            'file' => 'class-up-settings.php',
-            'file' => 'class-up-admin.php',
-            'file' => 'class-up-front.php',
-            'file' => 'class-up-capi.php',
-            'file' => 'class-up-events.php',
-        );
         // include if present
-        foreach ( array( 'class-up-settings.php', 'class-up-admin.php', 'class-up-front.php', 'class-up-capi.php', 'class-up-events.php', 'class-up-elementor.php' ) as $f ) {
+        foreach ( array( 'class-up-settings.php', 'class-up-admin.php', 'class-up-front.php', 'class-up-capi.php', 'class-up-events.php', 'class-up-elementor.php', 'settings.php', 'api-providers.php', 'ingest-handler.php' ) as $f ) {
             $path = $inc_dir . $f;
             if ( file_exists( $path ) ) {
                 require_once $path;
@@ -87,9 +80,10 @@ class UP_Loader {
                 WP_CLI::add_command( 'up-capi', function( $args, $assoc_args ) {
                     $limit = isset( $assoc_args['limit'] ) ? intval( $assoc_args['limit'] ) : 50;
                     $processed = UP_CAPI::process_queue( $limit );
-                    WP_CLI::success( "Processed {$processed} items (limit={$limit})" );
+                    WP_CLI::success( "Processed {\$processed} items (limit={\$limit})" );
                 } );
             }
         }
     }
 }
+

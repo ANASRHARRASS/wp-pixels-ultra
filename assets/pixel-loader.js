@@ -14,7 +14,7 @@
         var c = window.UP_CONSENT || {};
         // expected possible keys: ads / marketing, analytics
         return {
-            ads: c.ads === true || c.marketing === true || typeof c.ads === 'undefined' && typeof c.marketing === 'undefined',
+            ads: c.ads === true || c.marketing === true || (typeof c.ads === 'undefined' && typeof c.marketing === 'undefined'),
             analytics: c.analytics === true || typeof c.analytics === 'undefined'
         };
     }
@@ -27,27 +27,48 @@
     var CONSENT = getConsentState();
     var REGION_BLOCKED = regionBlocked();
 
+    // New: Build the provider payload and POST only provider_id + params to server
     function sendToServer(event) {
         if (typeof UP_CONFIG === 'undefined' || !UP_CONFIG.ingest_url) return;
         try {
+            // Determine provider id (priority):
+            // 1) event.provider_id (explicit)
+            // 2) event.custom_data.provider (e.g., set in data-up-payload or by code)
+            // 3) UP_CONFIG.default_provider (localized via PHP, optional)
+            var providerId = (event && event.provider_id) || (event && event.custom_data && event.custom_data.provider) || (typeof UP_CONFIG !== 'undefined' ? UP_CONFIG.default_provider : '') || '';
+
+            // Build the params to forward to the provider. Keep it minimal: client should not forward secrets.
+            // We forward the event payload (sanitized client-side), not any server-side secrets.
+            var params = {
+                // The provider receives the event. Server decides how to map that to provider API query.
+                event: event
+            };
+
+            var bodyObj = {
+                provider_id: providerId,
+                params: params
+            };
+
             // Validate event data can be serialized
-            var body = JSON.stringify(event);
+            var body = JSON.stringify(bodyObj);
             if (!body || body === '{}' || body === 'null') {
                 console.warn('UP: Empty or invalid event data, skipping server forward');
                 return;
             }
-            
+
             var headers = { 'Content-Type': 'application/json' };
             // Use WP REST nonce for same-origin authorization instead of exposing server secret
             if (UP_CONFIG.nonce) headers['X-WP-Nonce'] = UP_CONFIG.nonce;
+
+            // Keepalive to allow navigation without losing send
             fetch(UP_CONFIG.ingest_url, {
                 method: 'POST',
                 headers: headers,
                 body: body,
                 keepalive: true
-            }).catch(function (e) { console.warn('UP server forward failed:', e.message); });
-        } catch (e) { 
-            console.error('UP forward error:', e.message, event); 
+            }).catch(function (e) { console.warn('UP server forward failed:', e && e.message ? e.message : e); });
+        } catch (e) {
+            console.error('UP forward error:', e && e.message ? e.message : e, event);
         }
     }
 
@@ -143,7 +164,8 @@
                 var n = window.pintrk;
                 n.queue = []; n.version = '3.0';
                 var t = document.createElement('script');
-                t.async = true; t.src = e;
+                t.async = true;
+                t.src = e;
                 var r = document.getElementsByTagName('script')[0];
                 r.parentNode.insertBefore(t, r);
             }
@@ -189,7 +211,7 @@
                 var phone = u.pathname.replace(/\//g, '').split('?')[0] || (u.searchParams.get('phone') || '');
                 return { phone: phone, text: u.searchParams.get('text') || '' };
             }
-        } catch (e) { 
+        } catch (e) {
             // Silently ignore malformed URLs
         }
         return null;
@@ -202,15 +224,15 @@
             var eventName = el.getAttribute('data-up-event') || (el.getAttribute('data-up-whatsapp') ? 'whatsapp_click' : (el.classList.contains('up-whatsapp') ? 'whatsapp_click' : null));
             var payload = {};
             if (el.getAttribute('data-up-payload')) {
-                try { 
+                try {
                     var parsed = JSON.parse(el.getAttribute('data-up-payload'));
                     // Validate that parsed value is an object (not array, null, or primitive)
                     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
                         payload = parsed;
                     }
-                } catch (err) { 
+                } catch (err) {
                     console.warn('UP: Invalid JSON in data-up-payload:', err.message);
-                    payload = {}; 
+                    payload = {};
                 }
             }
 
@@ -314,7 +336,7 @@
             } catch (dlErr) {
                 console.error('UP: dataLayer push failed:', dlErr);
             }
-            
+
             if (CONSENT.analytics && !REGION_BLOCKED) {
                 sendToServer(formEvent);
             }
@@ -357,7 +379,7 @@
                     } catch (dlErr) {
                         console.error('UP: dataLayer push failed:', dlErr);
                     }
-                    
+
                     if (CONSENT.analytics && !REGION_BLOCKED) {
                         sendToServer(scrollEvent);
                     }
