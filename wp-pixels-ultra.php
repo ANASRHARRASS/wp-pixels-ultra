@@ -141,7 +141,7 @@ register_activation_hook( UP_PLUGIN_FILE, function() {
     if ( $wpdb->get_var( "SHOW TABLES LIKE '" . esc_sql( $table_name ) . "'" ) !== $table_name ) {
         $sql = "CREATE TABLE " . $table_name . " (
             id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
-            event_id VARCHAR(64) NOT NULL DEFAULT '',
+            event_id VARCHAR(64) NOT NULL,
             platform VARCHAR(50) NOT NULL,
             event_name VARCHAR(191) NOT NULL,
             payload LONGTEXT NOT NULL,
