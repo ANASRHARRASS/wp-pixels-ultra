@@ -56,6 +56,44 @@ class UP_REST_Ingest {
     }
 
     public static function ingest_event_callback( WP_REST_Request $request ) {
+        // --- BEGIN Rate limiting (per-IP and per-token) ---
+        $ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '0.0.0.0';
+        $token = $request->get_header( 'x-up-secret' );
+
+        // Get rate limit settings (with sane defaults)
+        $ip_limit = ( class_exists( 'UP_Settings' ) ? intval( UP_Settings::get( 'rate_limit_ip_per_min', 60 ) ) : 60 );
+        $token_limit = ( class_exists( 'UP_Settings' ) ? intval( UP_Settings::get( 'rate_limit_token_per_min', 300 ) ) : 300 );
+        $retry_after = ( class_exists( 'UP_Settings' ) ? intval( UP_Settings::get( 'retry_after_seconds', 60 ) ) : 60 );
+
+        // Per-IP rate limiting
+        $ip_key = 'up_ingest_ip_' . md5( $ip );
+        $ip_count = (int) get_transient( $ip_key );
+        if ( $ip_count >= $ip_limit ) {
+            if ( class_exists( 'UP_CAPI' ) ) {
+                UP_CAPI::log( 'warn', sprintf( 'Rate-limited ingest by IP %s (%d/%d)', $ip, $ip_count, $ip_limit ) );
+            }
+            $resp = new WP_REST_Response( array( 'error' => 'rate_limited', 'scope' => 'ip', 'limit' => $ip_limit ), 429 );
+            $resp->header( 'Retry-After', $retry_after );
+            return $resp;
+        }
+        set_transient( $ip_key, $ip_count + 1, $retry_after );
+
+        // Per-token rate limiting (if token provided)
+        if ( ! empty( $token ) ) {
+            $token_key = 'up_ingest_token_' . md5( $token );
+            $token_count = (int) get_transient( $token_key );
+            if ( $token_count >= $token_limit ) {
+                if ( class_exists( 'UP_CAPI' ) ) {
+                    UP_CAPI::log( 'warn', sprintf( 'Rate-limited ingest by token %s (%d/%d)', substr( $token, 0, 8 ), $token_count, $token_limit ) );
+                }
+                $resp = new WP_REST_Response( array( 'error' => 'rate_limited', 'scope' => 'token', 'limit' => $token_limit ), 429 );
+                $resp->header( 'Retry-After', $retry_after );
+                return $resp;
+            }
+            set_transient( $token_key, $token_count + 1, $retry_after );
+        }
+        // --- END Rate limiting ---
+
         $params = $request->get_json_params();
         if ( empty( $params ) || ! is_array( $params ) ) {
             return new WP_Error( 'invalid_payload', __( 'Invalid JSON payload.' ), array( 'status' => 400 ) );
@@ -72,10 +110,8 @@ class UP_REST_Ingest {
         }
         $event_id = sanitize_text_field( wp_unslash( $params['event_id'] ) );
 
-        if ( ! isset( $params['custom_data'] ) ) {
-            return new WP_Error( 'missing_custom_data', __( 'custom_data is required (can be empty object/array).' ), array( 'status' => 400 ) );
-        }
-        $custom_data = self::sanitize_custom_data( $params['custom_data'] );
+        // custom_data is optional, default to empty array if not provided
+        $custom_data = isset( $params['custom_data'] ) ? self::sanitize_custom_data( $params['custom_data'] ) : array();
 
         // Optional consent enforcement: if provided and false, reject
         if ( isset( $params['consent'] ) && $params['consent'] !== true && $params['consent'] !== 'true' ) {
@@ -91,15 +127,33 @@ class UP_REST_Ingest {
         }
         if ( ! empty( $user_data ) ) {
             $clean_ud = array();
-            foreach ( $user_data as $k => $v ) {
-                if ( in_array( $k, array( 'email', 'phone', 'phone_number' ), true ) && is_string( $v ) ) {
-                    $val = strtolower( trim( wp_unslash( $v ) ) );
-                    if ( $k === 'email' ) $clean_ud['email_hash'] = hash( 'sha256', $val );
-                    else $clean_ud['phone_hash'] = hash( 'sha256', preg_replace( '/\D+/', '', $val ) );
-                } else {
-                    $clean_ud[ sanitize_text_field( $k ) ] = is_string( $v ) ? sanitize_text_field( $v ) : $v;
-                }
+            
+            // Handle email
+            if ( isset( $user_data['email'] ) && is_string( $user_data['email'] ) ) {
+                $val = strtolower( trim( wp_unslash( $user_data['email'] ) ) );
+                $clean_ud['email_hash'] = hash( 'sha256', $val );
             }
+            
+            // Handle phone, prefer 'phone' over 'phone_number'
+            $phone_val = null;
+            if ( isset( $user_data['phone'] ) && is_string( $user_data['phone'] ) ) {
+                $phone_val = $user_data['phone'];
+            } elseif ( isset( $user_data['phone_number'] ) && is_string( $user_data['phone_number'] ) ) {
+                $phone_val = $user_data['phone_number'];
+            }
+            if ( $phone_val !== null ) {
+                $val = strtolower( trim( wp_unslash( $phone_val ) ) );
+                $clean_ud['phone_hash'] = hash( 'sha256', preg_replace( '/\D+/', '', $val ) );
+            }
+            
+            // Copy other fields, sanitizing appropriately
+            foreach ( $user_data as $k => $v ) {
+                if ( in_array( $k, array( 'email', 'phone', 'phone_number' ), true ) ) {
+                    continue;
+                }
+                $clean_ud[ sanitize_text_field( $k ) ] = is_string( $v ) ? sanitize_text_field( $v ) : $v;
+            }
+            
             $user_data = $clean_ud;
         }
 
@@ -164,7 +218,8 @@ class UP_REST_Ingest {
         if ( is_bool( $data ) ) return $data;
         if ( is_numeric( $data ) ) return $data + 0;
         if ( is_string( $data ) ) return sanitize_text_field( wp_unslash( $data ) );
-        return sanitize_text_field( wp_json_encode( $data ) );
+        // For unsupported types (objects, null, etc.), return null
+        return null;
     }
 
     protected static function get_client_ip( $request ) {

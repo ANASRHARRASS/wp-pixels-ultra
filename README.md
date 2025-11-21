@@ -231,9 +231,10 @@ DB tables: `up_capi_queue`, `up_capi_deadletter`.
 
 ## Changelog
 ### v0.4.4 (November 2025)
-- feat(rest): Public GTM client forwarder — adds `/up/v1/ingest` with nonce, secret, or same-origin auth; server-side enrichment and PII hashing.
-- fix(forwarder): Strip PII from `user_data` and support `user` alias; prefer `sendBeacon` for reliability.
+- feat(rest): Public GTM client forwarder — adds `/up/v1/ingest` with nonce, secret, or same-origin auth; includes per-IP and per-token rate limiting; server-side enrichment.
+- feat(forwarder): Client-side PII stripping from `user_data` for privacy; support `user` alias; uses `fetch` with `keepalive` for reliability.
 - feat(capi): Optional GTM server forwarding via `use_gtm_forwarder` + `gtm_server_url`.
+- security: Removed sensitive token exposure in GTM server forwarding.
 
 ### v0.4.3 (November 2025) - Production Improvements
 - 🚀 **Production-Ready GTM JSON**: Enhanced both GTM container templates with proper format version, timestamps, and metadata

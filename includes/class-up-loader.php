@@ -43,21 +43,32 @@ class UP_Loader {
                 wp_enqueue_script( 'up-pixel-loader', UP_PLUGIN_URL . 'assets/pixel-loader.js', array(), defined( 'UP_VERSION' ) ? UP_VERSION : false, true );
                 
                 // Enqueue GTM forwarder script for client-side GTM integration
-                wp_enqueue_script( 'up-gtm-forwarder', UP_PLUGIN_URL . 'assets/up-gtm-forwarder.js', array(), defined( 'UP_VERSION' ) ? UP_VERSION : false, true );
-                
-                wp_localize_script( 'up-gtm-forwarder', 'UP_CONFIG', array(
-                    'ingest_url' => esc_url_raw( rest_url( 'up/v1/ingest' ) ),
-                    'wp_nonce'   => wp_create_nonce( 'wp_rest' ),
-                    'gtm_id'     => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'gtm_container_id', '' ) : '',
-                    'gtm_server_url' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'gtm_server_url', '' ) : '',
-                    'meta_pixel_id' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'meta_pixel_id', '' ) : '',
-                    'tiktok_pixel_id' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'tiktok_pixel_id', '' ) : '',
-                    'google_ads_id' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'google_ads_id', '' ) : '',
-                    'snapchat_pixel_id' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'snapchat_pixel_id', '' ) : '',
-                    'pinterest_tag_id' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'pinterest_tag_id', '' ) : '',
-                    'gtm_manage_pixels' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'gtm_manage_pixels', 'no' ) === 'yes' : false,
-                    // NOTE: server_secret is intentionally NOT exposed to client-side.
-                ) );
+                // Only load if GTM is configured or any platform is enabled
+                $should_load_forwarder = false;
+                if ( class_exists( 'UP_Settings' ) ) {
+                    $gtm_id = UP_Settings::get( 'gtm_container_id', '' );
+                    $meta_enabled = UP_Settings::get( 'enable_meta', 'no' ) === 'yes';
+                    $tiktok_enabled = UP_Settings::get( 'enable_tiktok', 'no' ) === 'yes';
+                    $google_enabled = UP_Settings::get( 'enable_google_ads', 'no' ) === 'yes';
+                    $should_load_forwarder = ! empty( $gtm_id ) || $meta_enabled || $tiktok_enabled || $google_enabled;
+                }
+                if ( $should_load_forwarder ) {
+                    wp_enqueue_script( 'up-gtm-forwarder', UP_PLUGIN_URL . 'assets/up-gtm-forwarder.js', array(), defined( 'UP_VERSION' ) ? UP_VERSION : false, true );
+                    
+                    wp_localize_script( 'up-gtm-forwarder', 'UP_CONFIG', array(
+                        'ingest_url' => esc_url_raw( rest_url( 'up/v1/ingest' ) ),
+                        'wp_nonce'   => wp_create_nonce( 'wp_rest' ),
+                        'gtm_id'     => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'gtm_container_id', '' ) : '',
+                        'gtm_server_url' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'gtm_server_url', '' ) : '',
+                        'meta_pixel_id' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'meta_pixel_id', '' ) : '',
+                        'tiktok_pixel_id' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'tiktok_pixel_id', '' ) : '',
+                        'google_ads_id' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'google_ads_id', '' ) : '',
+                        'snapchat_pixel_id' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'snapchat_pixel_id', '' ) : '',
+                        'pinterest_tag_id' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'pinterest_tag_id', '' ) : '',
+                        'gtm_manage_pixels' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'gtm_manage_pixels', 'no' ) === 'yes' : false,
+                        // NOTE: server_secret is intentionally NOT exposed to client-side.
+                    ) );
+                }
             }
         } );
 

@@ -34,18 +34,27 @@
     window.UP_GTM_FORWARD = function (evt) {
       try {
         if (!evt || typeof evt !== 'object') return;
+        
+        // Create a shallow copy to avoid mutating caller's data
+        var normalizedEvt = Object.assign({}, evt);
+        
         // Normalize GTM alias: support evt.user but prefer evt.user_data
         if (evt.user && !evt.user_data) {
-          evt.user_data = evt.user;
+          normalizedEvt.user_data = evt.user;
+        } else if (evt.user_data) {
+          normalizedEvt.user_data = evt.user_data;
         }
+        
         // Remove raw PII coming from GTM; server will handle hashing
-        if (evt.user_data) {
-          if (evt.user_data.email) delete evt.user_data.email;
-          if (evt.user_data.phone) delete evt.user_data.phone;
-          if (evt.user_data.phone_number) delete evt.user_data.phone_number;
+        if (normalizedEvt.user_data && typeof normalizedEvt.user_data === 'object') {
+          normalizedEvt.user_data = Object.assign({}, normalizedEvt.user_data);
+          delete normalizedEvt.user_data.email;
+          delete normalizedEvt.user_data.phone;
+          delete normalizedEvt.user_data.phone_number;
         }
-        if (!evt.event) evt.event = evt.event_name || 'custom_event';
-        sendToIngest(evt);
+        
+        if (!normalizedEvt.event) normalizedEvt.event = normalizedEvt.event_name || 'custom_event';
+        sendToIngest(normalizedEvt);
       } catch (e) {
         if (window.console) console.error('UP_GTM_FORWARD exception', e);
       }
