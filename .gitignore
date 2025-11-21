@@ -49,3 +49,6 @@ logs/
 *.tmp
 *.bak
 .backup/
+
+# Security scanning baseline
+.secrets.baseline
