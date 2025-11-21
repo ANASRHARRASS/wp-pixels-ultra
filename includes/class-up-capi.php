@@ -591,23 +591,23 @@ class UP_CAPI {
 			'timestamp' => time(),
 		);
 		
-		// Optional: include CAPI token if configured (GTM server might need it for platform APIs)
-		$capi_token = UP_Settings::get( 'capi_token', '' );
-		$snapchat_token = UP_Settings::get( 'snapchat_api_token', '' );
-		$pinterest_token = UP_Settings::get( 'pinterest_access_token', '' );
-		
-		// Add platform-specific tokens to payload (GTM will use them to call platform APIs)
-		if ( ! empty( $capi_token ) ) {
-			$payload['tokens'] = array( 'capi_token' => $capi_token );
-		}
-		if ( ! empty( $snapchat_token ) ) {
-			if ( ! isset( $payload['tokens'] ) ) $payload['tokens'] = array();
-			$payload['tokens']['snapchat_api_token'] = $snapchat_token;
-		}
-		if ( ! empty( $pinterest_token ) ) {
-			if ( ! isset( $payload['tokens'] ) ) $payload['tokens'] = array();
-			$payload['tokens']['pinterest_access_token'] = $pinterest_token;
-		}
+		// SECURITY: Do NOT include sensitive platform tokens in payload to external GTM server.
+		// If GTM server requires authentication, use a non-sensitive shared secret or API key in headers.
+		// $capi_token = UP_Settings::get( 'capi_token', '' );
+		// $snapchat_token = UP_Settings::get( 'snapchat_api_token', '' );
+		// $pinterest_token = UP_Settings::get( 'pinterest_access_token', '' );
+		// (Tokens intentionally not sent to GTM server for security reasons.)
+
+
+
+
+
+
+
+
+
+
+
 		
 		$args = array(
 			'timeout' => 20,
