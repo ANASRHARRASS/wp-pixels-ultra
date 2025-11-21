@@ -39,10 +39,11 @@
         var normalizedEvt = Object.assign({}, evt);
         
         // Normalize GTM alias: support evt.user but prefer evt.user_data
+        // Create a copy to avoid mutating caller's data
         if (evt.user && !evt.user_data) {
-          normalizedEvt.user_data = evt.user;
+          normalizedEvt.user_data = Object.assign({}, evt.user);
         } else if (evt.user_data) {
-          normalizedEvt.user_data = evt.user_data;
+          normalizedEvt.user_data = Object.assign({}, evt.user_data);
         }
         
         // Remove raw PII coming from GTM; server will handle hashing

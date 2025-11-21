@@ -84,7 +84,7 @@ class UP_REST_Ingest {
             $token_count = (int) get_transient( $token_key );
             if ( $token_count >= $token_limit ) {
                 if ( class_exists( 'UP_CAPI' ) ) {
-                    UP_CAPI::log( 'warn', sprintf( 'Rate-limited ingest by token %s (%d/%d)', substr( $token, 0, 8 ), $token_count, $token_limit ) );
+                    UP_CAPI::log( 'warn', sprintf( 'Rate-limited ingest by token hash:%s (%d/%d)', substr( md5( $token ), 0, 8 ), $token_count, $token_limit ) );
                 }
                 $resp = new WP_REST_Response( array( 'error' => 'rate_limited', 'scope' => 'token', 'limit' => $token_limit ), 429 );
                 $resp->header( 'Retry-After', $retry_after );
