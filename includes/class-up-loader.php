@@ -6,15 +6,8 @@ class UP_Loader {
         $inc_dir = UP_PLUGIN_DIR . 'includes/';
 
         // core files (safe include)
-        $files = array(
-            'file' => 'class-up-settings.php',
-            'file' => 'class-up-admin.php',
-            'file' => 'class-up-front.php',
-            'file' => 'class-up-capi.php',
-            'file' => 'class-up-events.php',
-        );
         // include if present
-        foreach ( array( 'class-up-settings.php', 'class-up-admin.php', 'class-up-front.php', 'class-up-capi.php', 'class-up-events.php', 'class-up-elementor.php', 'class-up-rest-ingest.php' ) as $f ) {
+        foreach ( array( 'class-up-settings.php', 'class-up-admin.php', 'class-up-front.php', 'class-up-capi.php', 'class-up-events.php', 'class-up-elementor.php', 'settings.php', 'api-providers.php', 'ingest-handler.php' ) as $f ) {
             $path = $inc_dir . $f;
             if ( file_exists( $path ) ) {
                 require_once $path;
@@ -41,13 +34,9 @@ class UP_Loader {
             if ( defined( 'UP_PLUGIN_URL' ) ) {
                 // use the canonical assets path inside the plugin
                 wp_enqueue_script( 'up-pixel-loader', UP_PLUGIN_URL . 'assets/pixel-loader.js', array(), defined( 'UP_VERSION' ) ? UP_VERSION : false, true );
-                
-                // Enqueue GTM forwarder script for client-side GTM integration
-                wp_enqueue_script( 'up-gtm-forwarder', UP_PLUGIN_URL . 'assets/up-gtm-forwarder.js', array(), defined( 'UP_VERSION' ) ? UP_VERSION : false, true );
-                
-                wp_localize_script( 'up-gtm-forwarder', 'UP_CONFIG', array(
+                wp_localize_script( 'up-pixel-loader', 'UP_CONFIG', array(
                     'ingest_url' => esc_url_raw( rest_url( 'up/v1/ingest' ) ),
-                    'wp_nonce'   => wp_create_nonce( 'wp_rest' ),
+                    'nonce'      => wp_create_nonce( 'wp_rest' ),
                     'gtm_id'     => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'gtm_container_id', '' ) : '',
                     'gtm_server_url' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'gtm_server_url', '' ) : '',
                     'meta_pixel_id' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'meta_pixel_id', '' ) : '',
@@ -91,9 +80,10 @@ class UP_Loader {
                 WP_CLI::add_command( 'up-capi', function( $args, $assoc_args ) {
                     $limit = isset( $assoc_args['limit'] ) ? intval( $assoc_args['limit'] ) : 50;
                     $processed = UP_CAPI::process_queue( $limit );
-                    WP_CLI::success( "Processed {$processed} items (limit={$limit})" );
+                    WP_CLI::success( "Processed {\$processed} items (limit={\$limit})" );
                 } );
             }
         }
     }
 }
+
