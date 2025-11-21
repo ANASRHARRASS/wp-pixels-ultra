@@ -271,7 +271,7 @@ class UP_CAPI {
 		if ( empty( $events ) ) return new WP_Error( 'no_events', 'No events to send' );
 		
 		// Check if GTM forwarder is enabled
-		$use_gtm_forwarder = UP_Settings::get( 'use_gtm_forwarder', 'no' ) === 'yes';
+		$use_gtm_forwarder = class_exists( 'UP_Settings' ) && UP_Settings::get( 'use_gtm_forwarder', 'no' ) === 'yes';
 		
 		if ( $use_gtm_forwarder ) {
 			// Route all events through GTM Server Container
