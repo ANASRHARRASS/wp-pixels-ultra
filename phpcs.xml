@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<ruleset name="WP Pixels Ultra Standards">
+  <description>WordPress Coding Standards for wp-pixels-ultra plugin.</description>
+  <rule ref="WordPress" />
+  <rule ref="WordPress-Extra" />
+  <rule ref="WordPress-Docs" />
+  <exclude-pattern>vendor/*</exclude-pattern>
+  <exclude-pattern>assets/*</exclude-pattern>
+  <arg name="parallel" value="8" />
+</ruleset>
