@@ -50,7 +50,9 @@ class UP_Loader {
                     $meta_enabled = UP_Settings::get( 'enable_meta', 'no' ) === 'yes';
                     $tiktok_enabled = UP_Settings::get( 'enable_tiktok', 'no' ) === 'yes';
                     $google_enabled = UP_Settings::get( 'enable_google_ads', 'no' ) === 'yes';
-                    $should_load_forwarder = ! empty( $gtm_id ) || $meta_enabled || $tiktok_enabled || $google_enabled;
+                    $snapchat_enabled = UP_Settings::get( 'enable_snapchat', 'no' ) === 'yes';
+                    $pinterest_enabled = UP_Settings::get( 'enable_pinterest', 'no' ) === 'yes';
+                    $should_load_forwarder = ! empty( $gtm_id ) || $meta_enabled || $tiktok_enabled || $google_enabled || $snapchat_enabled || $pinterest_enabled;
                 }
                 if ( $should_load_forwarder ) {
                     wp_enqueue_script( 'up-gtm-forwarder', UP_PLUGIN_URL . 'assets/up-gtm-forwarder.js', array(), defined( 'UP_VERSION' ) ? UP_VERSION : false, true );
