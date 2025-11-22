@@ -57,7 +57,16 @@ class UP_REST_Ingest {
 
     public static function ingest_event_callback( WP_REST_Request $request ) {
         // --- BEGIN Rate limiting (per-IP and per-token) ---
-        $ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '0.0.0.0';
+        if ( empty( $_SERVER['REMOTE_ADDR'] ) ) {
+            if ( class_exists( 'UP_CAPI' ) ) {
+                UP_CAPI::log( 'error', 'Ingest request missing REMOTE_ADDR. Possible server misconfiguration or proxy issue.' );
+            }
+            return new WP_REST_Response(
+                array( 'error' => 'missing_remote_addr', 'message' => 'Client IP address (REMOTE_ADDR) is required.' ),
+                400
+            );
+        }
+        $ip = sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) );
         $token = $request->get_header( 'x-up-secret' );
 
         // Get rate limit settings (with sane defaults)
