@@ -6,7 +6,11 @@ class UP_Loader {
         $inc_dir = UP_PLUGIN_DIR . 'includes/';
 
         // include if present
+<<<<<<< HEAD
         foreach ( array( 'class-up-settings.php', 'class-up-admin.php', 'class-up-front.php', 'class-up-capi.php', 'class-up-events.php', 'class-up-rest.php', 'class-up-elementor.php' ) as $f ) {
+=======
+        foreach ( array( 'class-up-settings.php', 'class-up-admin.php', 'class-up-front.php', 'class-up-capi.php', 'class-up-events.php', 'class-up-elementor.php', 'class-up-rest-ingest.php' ) as $f ) {
+>>>>>>> origin/main
             $path = $inc_dir . $f;
             if ( file_exists( $path ) ) {
                 require_once $path;
@@ -33,9 +37,13 @@ class UP_Loader {
             if ( defined( 'UP_PLUGIN_URL' ) ) {
                 // use the canonical assets path inside the plugin
                 wp_enqueue_script( 'up-pixel-loader', UP_PLUGIN_URL . 'assets/pixel-loader.js', array(), defined( 'UP_VERSION' ) ? UP_VERSION : false, true );
-                wp_localize_script( 'up-pixel-loader', 'UP_CONFIG', array(
+                
+                // Enqueue GTM forwarder script for client-side GTM integration
+                wp_enqueue_script( 'up-gtm-forwarder', UP_PLUGIN_URL . 'assets/up-gtm-forwarder.js', array(), defined( 'UP_VERSION' ) ? UP_VERSION : false, true );
+                
+                wp_localize_script( 'up-gtm-forwarder', 'UP_CONFIG', array(
                     'ingest_url' => esc_url_raw( rest_url( 'up/v1/ingest' ) ),
-                    'nonce'      => wp_create_nonce( 'wp_rest' ),
+                    'wp_nonce'   => wp_create_nonce( 'wp_rest' ),
                     'gtm_id'     => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'gtm_container_id', '' ) : '',
                     'gtm_server_url' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'gtm_server_url', '' ) : '',
                     'meta_pixel_id' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'meta_pixel_id', '' ) : '',
