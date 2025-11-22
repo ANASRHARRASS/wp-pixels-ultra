@@ -67,8 +67,12 @@ class UP_Settings {
             'meta_pixel_id'     => '',
             'tiktok_pixel_id'   => '',
             'google_ads_id'     => '',
+            'google_ads_label'  => '',
             'snapchat_pixel_id' => '',
+            'snapchat_api_token'=> '',
             'pinterest_tag_id'  => '',
+            'pinterest_access_token' => '',
+            'gtm_manage_pixels' => 'no',
             'enable_gtm'        => 'no',
             'enable_meta'       => 'no',
             'enable_tiktok'     => 'no',
@@ -76,6 +80,7 @@ class UP_Settings {
             'enable_snapchat'   => 'no',
             'enable_pinterest'  => 'no',
             'gtm_server_url'    => '',
+            'use_gtm_forwarder' => 'no',
             'server_secret'     => '',
             'capi_endpoint'     => '',
             'capi_token'        => '',
@@ -104,6 +109,8 @@ class UP_Settings {
                     case 'enable_google_ads':
                     case 'enable_snapchat':
                     case 'enable_pinterest':
+                    case 'gtm_manage_pixels':
+                    case 'use_gtm_forwarder':
                         $out[ $key ] = ( $val === 'yes' ) ? 'yes' : 'no';
                         break;
                     case 'rate_limit_ip_per_min':
@@ -113,6 +120,11 @@ class UP_Settings {
                         break;
                     case 'capi_token':
                         // token-like values: sanitize_text_field then trim
+                        $out[ $key ] = sanitize_text_field( trim( $val ) );
+                        break;
+                    case 'google_ads_label':
+                    case 'snapchat_api_token':
+                    case 'pinterest_access_token':
                         $out[ $key ] = sanitize_text_field( trim( $val ) );
                         break;
                     case 'capi_endpoint':
@@ -169,6 +181,16 @@ class UP_Settings {
                 <?php settings_fields( 'up_settings_group' ); ?>
                 <table class="form-table">
                     <tr>
+                        <th scope="row"><label for="gtm_manage_pixels">Let GTM manage all client pixels</label></th>
+                        <td>
+                            <select name="up_settings[gtm_manage_pixels]" id="gtm_manage_pixels">
+                                <option value="no" <?php selected( $opts['gtm_manage_pixels'], 'no' ); ?>>No</option>
+                                <option value="yes" <?php selected( $opts['gtm_manage_pixels'], 'yes' ); ?>>Yes</option>
+                            </select>
+                            <p class="description">When set to Yes, the plugin will NOT inject Meta/TikTok/Snapchat/Pinterest base code; use GTM tags instead. Server-side queue still runs.</p>
+                        </td>
+                    </tr>
+                    <tr>
                         <th scope="row"><label for="gtm_container_id">GTM Container ID</label></th>
                         <td><input name="up_settings[gtm_container_id]" id="gtm_container_id" type="text" value="<?php echo esc_attr( $opts['gtm_container_id'] ); ?>" class="regular-text" /></td>
                     </tr>
@@ -214,6 +236,12 @@ class UP_Settings {
                         </td>
                     </tr>
                     <tr>
+                        <th scope="row"><label for="google_ads_label">Google Ads Conversion Label</label></th>
+                        <td><input name="up_settings[google_ads_label]" id="google_ads_label" type="text" value="<?php echo esc_attr( $opts['google_ads_label'] ); ?>" class="regular-text" />
+                        <p class="description">Optional: Conversion label for enhanced conversions / offline uploads.</p>
+                        </td>
+                    </tr>
+                    <tr>
                         <th scope="row"><label for="enable_google_ads">Enable Google Ads</label></th>
                         <td>
                             <select name="up_settings[enable_google_ads]" id="enable_google_ads">
@@ -225,6 +253,12 @@ class UP_Settings {
                     <tr>
                         <th scope="row"><label for="snapchat_pixel_id">Snapchat Pixel ID</label></th>
                         <td><input name="up_settings[snapchat_pixel_id]" id="snapchat_pixel_id" type="text" value="<?php echo esc_attr( $opts['snapchat_pixel_id'] ); ?>" class="regular-text" /></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="snapchat_api_token">Snapchat API Token</label></th>
+                        <td><input name="up_settings[snapchat_api_token]" id="snapchat_api_token" type="text" value="<?php echo esc_attr( $opts['snapchat_api_token'] ); ?>" class="regular-text" />
+                        <p class="description">Bearer token for Snapchat Conversions API (do not expose publicly).</p>
+                        </td>
                     </tr>
                     <tr>
                         <th scope="row"><label for="enable_snapchat">Enable Snapchat</label></th>
@@ -240,6 +274,12 @@ class UP_Settings {
                         <td><input name="up_settings[pinterest_tag_id]" id="pinterest_tag_id" type="text" value="<?php echo esc_attr( $opts['pinterest_tag_id'] ); ?>" class="regular-text" /></td>
                     </tr>
                     <tr>
+                        <th scope="row"><label for="pinterest_access_token">Pinterest Access Token</label></th>
+                        <td><input name="up_settings[pinterest_access_token]" id="pinterest_access_token" type="text" value="<?php echo esc_attr( $opts['pinterest_access_token'] ); ?>" class="regular-text" />
+                        <p class="description">Access token for Pinterest Conversions API.</p>
+                        </td>
+                    </tr>
+                    <tr>
                         <th scope="row"><label for="enable_pinterest">Enable Pinterest</label></th>
                         <td>
                             <select name="up_settings[enable_pinterest]" id="enable_pinterest">
@@ -252,6 +292,16 @@ class UP_Settings {
                         <th scope="row"><label for="gtm_server_url">GTM Server Container URL</label></th>
                         <td><input name="up_settings[gtm_server_url]" id="gtm_server_url" type="text" value="<?php echo esc_attr( $opts['gtm_server_url'] ); ?>" class="regular-text" />
                         <p class="description">Optional: Enter your server-side GTM container URL for enhanced measurement</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="use_gtm_forwarder">Use GTM Server for Event Forwarding</label></th>
+                        <td>
+                            <select name="up_settings[use_gtm_forwarder]" id="use_gtm_forwarder">
+                                <option value="no" <?php selected( $opts['use_gtm_forwarder'], 'no' ); ?>>No</option>
+                                <option value="yes" <?php selected( $opts['use_gtm_forwarder'], 'yes' ); ?>>Yes</option>
+                            </select>
+                            <p class="description">When enabled, all server-side events are forwarded to GTM Server Container instead of directly calling platform APIs. Requires GTM Server Container URL to be configured.</p>
                         </td>
                     </tr>
                     <tr>

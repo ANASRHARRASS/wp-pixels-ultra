@@ -1,19 +1,54 @@
 (function () {
     'use strict';
 
+    // Validate UP_CONFIG is properly structured
+    if (typeof UP_CONFIG !== 'undefined') {
+        if (typeof UP_CONFIG !== 'object' || UP_CONFIG === null) {
+            console.error('UP: Invalid UP_CONFIG - expected object, got', typeof UP_CONFIG);
+            window.UP_CONFIG = undefined;
+        }
+    }
+
+    // Consent + region gating helpers (non-blocking defaults)
+    function getConsentState() {
+        var c = window.UP_CONSENT || {};
+        // expected possible keys: ads / marketing, analytics
+        return {
+            ads: c.ads === true || c.marketing === true || typeof c.ads === 'undefined' && typeof c.marketing === 'undefined',
+            analytics: c.analytics === true || typeof c.analytics === 'undefined'
+        };
+    }
+    function regionBlocked() {
+        var region = (window.UP_REGION || (typeof UP_CONFIG !== 'undefined' ? UP_CONFIG.region_code : '') || '').toString().toLowerCase();
+        var blocked = window.UP_REGION_BLOCKED || (typeof UP_CONFIG !== 'undefined' ? UP_CONFIG.region_blocked : []) || [];
+        if (!Array.isArray(blocked)) return false;
+        return blocked.map(function (r) { return (r || '').toString().toLowerCase(); }).indexOf(region) !== -1;
+    }
+    var CONSENT = getConsentState();
+    var REGION_BLOCKED = regionBlocked();
+
     function sendToServer(event) {
         if (typeof UP_CONFIG === 'undefined' || !UP_CONFIG.ingest_url) return;
         try {
+            // Validate event data can be serialized
+            var body = JSON.stringify(event);
+            if (!body || body === '{}' || body === 'null') {
+                console.warn('UP: Empty or invalid event data, skipping server forward');
+                return;
+            }
+            
             var headers = { 'Content-Type': 'application/json' };
             // Use WP REST nonce for same-origin authorization instead of exposing server secret
             if (UP_CONFIG.nonce) headers['X-WP-Nonce'] = UP_CONFIG.nonce;
             fetch(UP_CONFIG.ingest_url, {
                 method: 'POST',
                 headers: headers,
-                body: JSON.stringify(event),
+                body: body,
                 keepalive: true
-            }).catch(function (e) { console.warn('UP server forward failed', e); });
-        } catch (e) { console.warn('UP forward error', e); }
+            }).catch(function (e) { console.warn('UP server forward failed:', e.message); });
+        } catch (e) { 
+            console.error('UP forward error:', e.message, event); 
+        }
     }
 
     function generateEventId() {
@@ -47,8 +82,13 @@
         injectGTM(UP_CONFIG.gtm_id);
     }
 
-    // Inject Meta Pixel (minimal) if configured
-    if (typeof UP_CONFIG !== 'undefined' && UP_CONFIG.meta_pixel_id) {
+    var GTM_MANAGES = (typeof UP_CONFIG !== 'undefined' && !!UP_CONFIG.gtm_manage_pixels);
+
+    // Determine if advertising pixels allowed
+    var TRACK_ADS = CONSENT.ads && !REGION_BLOCKED;
+
+    // Inject Meta Pixel (minimal) if configured, allowed, and not managed by GTM
+    if (TRACK_ADS && !GTM_MANAGES && typeof UP_CONFIG !== 'undefined' && UP_CONFIG.meta_pixel_id) {
         (function (f, b, e, v, n, t, s) {
             if (f.fbq) return;
             n = f.fbq = function () { n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments); };
@@ -60,8 +100,8 @@
         try { window.fbq('init', UP_CONFIG.meta_pixel_id); window.fbq('track', 'PageView'); } catch (err) { /* ignore */ }
     }
 
-    // Inject TikTok Pixel (minimal) if configured
-    if (typeof UP_CONFIG !== 'undefined' && UP_CONFIG.tiktok_pixel_id) {
+    // Inject TikTok Pixel (minimal) if configured, allowed, and not managed by GTM
+    if (TRACK_ADS && !GTM_MANAGES && typeof UP_CONFIG !== 'undefined' && UP_CONFIG.tiktok_pixel_id) {
         (function (w, d, t) {
             w.TiktokAnalyticsObject = t;
             var ttq = w[t] = w[t] || [];
@@ -80,8 +120,8 @@
         })(window, document, 'ttq');
     }
 
-    // Inject Snapchat Pixel if configured
-    if (typeof UP_CONFIG !== 'undefined' && UP_CONFIG.snapchat_pixel_id) {
+    // Inject Snapchat Pixel if configured, allowed, and not managed by GTM
+    if (TRACK_ADS && !GTM_MANAGES && typeof UP_CONFIG !== 'undefined' && UP_CONFIG.snapchat_pixel_id) {
         (function (e, t, n) {
             if (e.snaptr) return;
             var a = e.snaptr = function () { a.handleRequest ? a.handleRequest.apply(a, arguments) : a.queue.push(arguments); };
@@ -95,8 +135,8 @@
         try { window.snaptr('init', UP_CONFIG.snapchat_pixel_id); window.snaptr('track', 'PAGE_VIEW'); } catch (err) { /* ignore */ }
     }
 
-    // Inject Pinterest Tag if configured
-    if (typeof UP_CONFIG !== 'undefined' && UP_CONFIG.pinterest_tag_id) {
+    // Inject Pinterest Tag if configured, allowed, and not managed by GTM
+    if (TRACK_ADS && !GTM_MANAGES && typeof UP_CONFIG !== 'undefined' && UP_CONFIG.pinterest_tag_id) {
         (function (e) {
             if (!window.pintrk) {
                 window.pintrk = function () { window.pintrk.queue.push(Array.prototype.slice.call(arguments)); };
@@ -112,11 +152,22 @@
     }
 
     // Push to dataLayer for GTM first
-    window.dataLayer = window.dataLayer || [];
-    window.dataLayer.push(event);
+    try {
+        window.dataLayer = window.dataLayer || [];
+        if (Array.isArray(window.dataLayer)) {
+            window.dataLayer.push(event);
+        } else {
+            console.warn('UP: dataLayer is not an array, reinitializing');
+            window.dataLayer = [event];
+        }
+    } catch (err) {
+        console.error('UP: Failed to push to dataLayer:', err);
+    }
 
     // Fire server copy
-    sendToServer(event);
+    if (CONSENT.analytics && !REGION_BLOCKED) {
+        sendToServer(event);
+    }
 
     // Optionally fire vendor client snippets here (fbq, TikTok) if present
 
@@ -138,7 +189,9 @@
                 var phone = u.pathname.replace(/\//g, '').split('?')[0] || (u.searchParams.get('phone') || '');
                 return { phone: phone, text: u.searchParams.get('text') || '' };
             }
-        } catch (e) { }
+        } catch (e) { 
+            // Silently ignore malformed URLs
+        }
         return null;
     }
 
@@ -149,7 +202,16 @@
             var eventName = el.getAttribute('data-up-event') || (el.getAttribute('data-up-whatsapp') ? 'whatsapp_click' : (el.classList.contains('up-whatsapp') ? 'whatsapp_click' : null));
             var payload = {};
             if (el.getAttribute('data-up-payload')) {
-                try { payload = JSON.parse(el.getAttribute('data-up-payload')); } catch (err) { payload = {}; }
+                try { 
+                    var parsed = JSON.parse(el.getAttribute('data-up-payload'));
+                    // Validate that parsed value is an object (not array, null, or primitive)
+                    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                        payload = parsed;
+                    }
+                } catch (err) { 
+                    console.warn('UP: Invalid JSON in data-up-payload:', err.message);
+                    payload = {}; 
+                }
             }
 
             // If it's a link, try parse whatsapp details
@@ -165,6 +227,10 @@
 
             if (!eventName) return;
 
+            // Normalize whatsapp fields into custom_data namespace
+            if (payload.whatsapp_phone) {
+                payload.channel = 'whatsapp';
+            }
             var ev = {
                 event: 'up_event',
                 event_name: eventName,
@@ -176,12 +242,20 @@
             };
 
             // push to dataLayer for GTM
-            window.dataLayer = window.dataLayer || [];
-            window.dataLayer.push(ev);
+            try {
+                window.dataLayer = window.dataLayer || [];
+                if (Array.isArray(window.dataLayer)) {
+                    window.dataLayer.push(ev);
+                }
+            } catch (dlErr) {
+                console.error('UP: dataLayer push failed:', dlErr);
+            }
 
-            // send to server ingest
-            sendToServer(ev);
-        } catch (err) { console.warn('UP click handler error', err); }
+            // send to server only if analytics consent granted
+            if (CONSENT.analytics && !REGION_BLOCKED) {
+                sendToServer(ev);
+            }
+        } catch (err) { console.warn('UP click handler error:', err.message); }
     }
 
     // listen capture to catch clicks early (works for dynamically added elements too)
@@ -192,24 +266,27 @@
         try {
             var form = e.target;
             if (!form || form.tagName !== 'FORM') return;
-            
+
             // Skip if form has data-up-no-track attribute
             if (form.getAttribute('data-up-no-track')) return;
-            
+
             // Get form details
             var formName = form.getAttribute('name') || form.getAttribute('id') || 'unnamed_form';
             var formAction = form.getAttribute('action') || window.location.href;
             var formMethod = form.getAttribute('method') || 'get';
-            
+
             // Check if it's a search form
             var isSearch = form.querySelector('input[type="search"], input[name="s"], input[name="search"]') !== null;
-            
+
             var eventName = isSearch ? 'search' : 'form_submit';
-            
+
+            // Deterministic form event id based on name+action+method for dedup across client/server (hash-like simple approach)
+            var hashSource = formName + '|' + formAction + '|' + formMethod;
+            var hash = 0; for (var i = 0; i < hashSource.length; i++) { hash = ((hash << 5) - hash) + hashSource.charCodeAt(i); hash |= 0; }
             var formEvent = {
                 event: 'up_event',
                 event_name: eventName,
-                event_id: 'form_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+                event_id: 'form_' + Math.abs(hash),
                 event_time: Math.floor(Date.now() / 1000),
                 source_url: window.location.href,
                 custom_data: {
@@ -219,7 +296,7 @@
                     form_field_count: form.querySelectorAll('input, textarea, select').length
                 }
             };
-            
+
             // Add search query if it's a search form
             if (isSearch) {
                 var searchInput = form.querySelector('input[type="search"], input[name="s"], input[name="search"]');
@@ -227,53 +304,70 @@
                     formEvent.custom_data.search_term = searchInput.value;
                 }
             }
-            
+
             // Push to dataLayer
-            window.dataLayer = window.dataLayer || [];
-            window.dataLayer.push(formEvent);
+            try {
+                window.dataLayer = window.dataLayer || [];
+                if (Array.isArray(window.dataLayer)) {
+                    window.dataLayer.push(formEvent);
+                }
+            } catch (dlErr) {
+                console.error('UP: dataLayer push failed:', dlErr);
+            }
             
-            // Send to server
-            sendToServer(formEvent);
+            if (CONSENT.analytics && !REGION_BLOCKED) {
+                sendToServer(formEvent);
+            }
         } catch (err) {
-            console.warn('UP form handler error', err);
+            console.warn('UP form handler error:', err.message);
         }
     }
-    
+
     // Listen for form submissions
     document.addEventListener('submit', handleFormSubmit, true);
-    
+
     // Scroll depth tracking (25%, 50%, 75%, 90%)
-    (function() {
+    (function () {
         var depths = [25, 50, 75, 90];
         var tracked = {};
-        
+
         function checkScrollDepth() {
             var scrolled = (window.scrollY / (document.body.scrollHeight - window.innerHeight)) * 100;
-            
-            depths.forEach(function(depth) {
+
+            depths.forEach(function (depth) {
                 if (scrolled >= depth && !tracked[depth]) {
                     tracked[depth] = true;
-                    
+
                     var scrollEvent = {
                         event: 'up_event',
                         event_name: 'scroll_depth',
-                        event_id: 'scroll_' + depth + '_' + Date.now(),
+                        event_id: 'scroll_' + depth, // deterministic per depth per page
                         event_time: Math.floor(Date.now() / 1000),
                         source_url: window.location.href,
                         custom_data: {
                             depth: depth + '%'
                         }
                     };
+
+                    try {
+                        window.dataLayer = window.dataLayer || [];
+                        if (Array.isArray(window.dataLayer)) {
+                            window.dataLayer.push(scrollEvent);
+                        }
+                    } catch (dlErr) {
+                        console.error('UP: dataLayer push failed:', dlErr);
+                    }
                     
-                    window.dataLayer = window.dataLayer || [];
-                    window.dataLayer.push(scrollEvent);
+                    if (CONSENT.analytics && !REGION_BLOCKED) {
+                        sendToServer(scrollEvent);
+                    }
                 }
             });
         }
-        
+
         // Throttle scroll events
         var scrollTimeout;
-        window.addEventListener('scroll', function() {
+        window.addEventListener('scroll', function () {
             if (scrollTimeout) clearTimeout(scrollTimeout);
             scrollTimeout = setTimeout(checkScrollDepth, 200);
         });

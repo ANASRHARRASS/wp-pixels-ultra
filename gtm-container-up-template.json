@@ -1,0 +1,182 @@
+{
+  "exportFormatVersion": 2,
+  "exportTime": "2025-11-18 03:16:48",
+  "containerVersion": {
+    "path": "accounts/000000/containers/000000/versions/0",
+    "accountId": "000000",
+    "containerId": "000000",
+    "containerVersionId": "0",
+    "name": "Ultra Pixels - Starter Template",
+    "description": "Minimal starter GTM container template for Ultra Pixels plugin. Use this as a starting point for custom implementations. For complete production setup, use ultra-pixels-gtm-container.json instead.",
+    "container": {
+      "publicId": "GTM-XXXXXXX",
+      "name": "Ultra Pixels Starter",
+      "usageContext": [
+        "WEB"
+      ],
+      "fingerprint": "0"
+    },
+    "tag": [
+      {
+        "name": "Meta Purchase",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "BOOLEAN",
+            "key": "supportDocumentWrite",
+            "value": "false"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<script>if(window.fbq){fbq('track','Purchase',{value:{{value}},currency:'{{currency}}'},{eventID:'{{event_id}}'});} </script>"
+          }
+        ],
+        "firingTriggerId": [
+          "TRG_UP_EVENT_PURCHASE"
+        ],
+        "tagFiringOption": "ONCE_PER_EVENT"
+      },
+      {
+        "name": "TikTok Purchase",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "BOOLEAN",
+            "key": "supportDocumentWrite",
+            "value": "false"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<script>if(window.ttq){ttq.track('PlaceAnOrder',{value:{{value}},currency:'{{currency}}'},{event_id:'{{event_id}}'});} </script>"
+          }
+        ],
+        "firingTriggerId": [
+          "TRG_UP_EVENT_PURCHASE"
+        ],
+        "tagFiringOption": "ONCE_PER_EVENT"
+      }
+    ],
+    "trigger": [
+      {
+        "triggerId": "TRG_UP_EVENT_ALL",
+        "name": "Ultra Pixels - All up_event",
+        "type": "CUSTOM_EVENT",
+        "customEventFilter": [
+          {
+            "type": "EQUALS",
+            "parameter": [
+              {
+                "type": "TEMPLATE",
+                "key": "arg0",
+                "value": "{{_event}}"
+              },
+              {
+                "type": "TEMPLATE",
+                "key": "arg1",
+                "value": "up_event"
+              }
+            ]
+          }
+        ],
+        "fingerprint": "0"
+      },
+      {
+        "triggerId": "TRG_UP_EVENT_PURCHASE",
+        "name": "Ultra Pixels - purchase",
+        "type": "CUSTOM_EVENT",
+        "customEventFilter": [
+          {
+            "type": "AND",
+            "parameter": [
+              {
+                "type": "EQUALS",
+                "key": "param0",
+                "value": "dummy"
+              },
+              {
+                "type": "EQUALS",
+                "parameter": [
+                  {
+                    "type": "TEMPLATE",
+                    "key": "arg0",
+                    "value": "{{_event}}"
+                  },
+                  {
+                    "type": "TEMPLATE",
+                    "key": "arg1",
+                    "value": "up_event"
+                  }
+                ]
+              },
+              {
+                "type": "EQUALS",
+                "parameter": [
+                  {
+                    "type": "TEMPLATE",
+                    "key": "arg0",
+                    "value": "{{event_name}}"
+                  },
+                  {
+                    "type": "TEMPLATE",
+                    "key": "arg1",
+                    "value": "purchase"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "fingerprint": "0"
+      }
+    ],
+    "variable": [
+      {
+        "name": "event_name",
+        "type": "v",
+        "parameter": [
+          {
+            "key": "name",
+            "type": "TEMPLATE",
+            "value": "event_name"
+          }
+        ]
+      },
+      {
+        "name": "event_id",
+        "type": "v",
+        "parameter": [
+          {
+            "key": "name",
+            "type": "TEMPLATE",
+            "value": "event_id"
+          }
+        ]
+      },
+      {
+        "name": "value",
+        "type": "v",
+        "parameter": [
+          {
+            "key": "name",
+            "type": "TEMPLATE",
+            "value": "value"
+          }
+        ]
+      },
+      {
+        "name": "currency",
+        "type": "v",
+        "parameter": [
+          {
+            "key": "name",
+            "type": "TEMPLATE",
+            "value": "currency"
+          }
+        ]
+      }
+    ],
+    "fingerprint": "0"
+  }
+}
