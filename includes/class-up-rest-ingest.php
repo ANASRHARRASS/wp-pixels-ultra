@@ -79,7 +79,7 @@ class UP_REST_Ingest {
         $ip_count = (int) get_transient( $ip_key );
         if ( $ip_count >= $ip_limit ) {
             if ( class_exists( 'UP_CAPI' ) ) {
-                UP_CAPI::log( 'warn', sprintf( 'Rate-limited ingest by IP %s (%d/%d)', $ip, $ip_count, $ip_limit ) );
+                UP_CAPI::log( 'warn', sprintf( 'Rate-limited ingest by IP hash:%s (%d/%d)', substr( md5( $ip ), 0, 8 ), $ip_count, $ip_limit ) );
             }
             $resp = new WP_REST_Response( array( 'error' => 'rate_limited', 'scope' => 'ip', 'limit' => $ip_limit ), 429 );
             $resp->header( 'Retry-After', $retry_after );
