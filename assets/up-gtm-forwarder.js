@@ -46,7 +46,7 @@
           normalizedEvt.user_data = Object.assign({}, evt.user_data);
         }
         
-        // Remove raw PII coming from GTM; server will handle hashing
+        // Remove raw PII for privacy; these fields are not sent to the server
         if (normalizedEvt.user_data && typeof normalizedEvt.user_data === 'object') {
           normalizedEvt.user_data = Object.assign({}, normalizedEvt.user_data);
           delete normalizedEvt.user_data.email;
