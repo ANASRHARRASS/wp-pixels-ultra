@@ -5,16 +5,8 @@ class UP_Loader {
     public static function init() {
         $inc_dir = UP_PLUGIN_DIR . 'includes/';
 
-        // core files (safe include)
-        $files = array(
-            'file' => 'class-up-settings.php',
-            'file' => 'class-up-admin.php',
-            'file' => 'class-up-front.php',
-            'file' => 'class-up-capi.php',
-            'file' => 'class-up-events.php',
-        );
         // include if present
-        foreach ( array( 'class-up-settings.php', 'class-up-admin.php', 'class-up-front.php', 'class-up-capi.php', 'class-up-events.php', 'class-up-elementor.php', 'class-up-rest-ingest.php' ) as $f ) {
+        foreach ( array( 'class-up-settings.php', 'class-up-admin.php', 'class-up-front.php', 'class-up-capi.php', 'class-up-events.php', 'class-up-rest.php', 'class-up-elementor.php', 'class-up-rest-ingest.php' ) as $f ) {
             $path = $inc_dir . $f;
             if ( file_exists( $path ) ) {
                 require_once $path;
