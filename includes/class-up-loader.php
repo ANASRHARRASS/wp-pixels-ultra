@@ -6,11 +6,7 @@ class UP_Loader {
         $inc_dir = UP_PLUGIN_DIR . 'includes/';
 
         // include if present
-<<<<<<< HEAD
-        foreach ( array( 'class-up-settings.php', 'class-up-admin.php', 'class-up-front.php', 'class-up-capi.php', 'class-up-events.php', 'class-up-rest.php', 'class-up-elementor.php' ) as $f ) {
-=======
-        foreach ( array( 'class-up-settings.php', 'class-up-admin.php', 'class-up-front.php', 'class-up-capi.php', 'class-up-events.php', 'class-up-elementor.php', 'class-up-rest-ingest.php' ) as $f ) {
->>>>>>> origin/main
+        foreach ( array( 'class-up-settings.php', 'class-up-admin.php', 'class-up-front.php', 'class-up-capi.php', 'class-up-events.php', 'class-up-rest.php', 'class-up-elementor.php', 'class-up-rest-ingest.php' ) as $f ) {
             $path = $inc_dir . $f;
             if ( file_exists( $path ) ) {
                 require_once $path;
