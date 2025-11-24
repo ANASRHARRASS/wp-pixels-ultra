@@ -255,8 +255,8 @@ The `UP_GTM_FORWARD()` function accepts this payload structure:
   event_id: 'unique-event-id-for-deduplication',
   event_time: 1234567890, // Unix timestamp
   user_data: {
-    email: 'user@example.com', // Will be hashed server-side
-    phone: '+1234567890', // Will be hashed server-side
+    email: 'user@example.com', // Will be removed by the forwarder script before sending to the server
+    phone: '+1234567890', // Will be removed by the forwarder script before sending to the server
     // Do NOT include pre-hashed values
   },
   custom_data: {
@@ -271,7 +271,7 @@ The `UP_GTM_FORWARD()` function accepts this payload structure:
 ```
 
 **Important Notes:**
-- **PII Handling**: Send raw email/phone in `user_data`. The forwarder script automatically removes these PII fields before sending to WordPress as a privacy feature. The WordPress server never receives raw PII in this flow. If you need server-side PII hashing, you must hash the PII client-side in GTM before calling the forwarder function.
+- **PII Handling**: Send raw email/phone in `user_data`. The forwarder script automatically removes these PII fields before sending to WordPress as a privacy feature. **Note:** The statement "The WordPress server never receives raw PII in this flow" applies only to the GTM client-side forwarder. If you use direct REST API calls to `/wp-json/up/v1/ingest` (such as from `pixel-loader.js`), the server does receive raw PII and hashes it server-side. If you require server-side PII hashing with the GTM forwarder, you must hash the PII client-side in GTM before calling the forwarder function.
 - **Event IDs**: Use deterministic IDs for purchases (`order_{{Order ID}}`) to enable proper deduplication between client and server events.
 - **Platform Names**: Use lowercase platform identifiers: `meta`, `tiktok`, `google_ads`, `snapchat`, `pinterest`.
 

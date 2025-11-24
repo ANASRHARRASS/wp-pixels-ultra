@@ -286,7 +286,7 @@
             var formEvent = {
                 event: 'up_event',
                 event_name: eventName,
-                event_id: 'form_' + Math.abs(hash),
+                event_id: 'form_' + Math.abs(hash) + '_' + Date.now(),
                 event_time: Math.floor(Date.now() / 1000),
                 source_url: window.location.href,
                 custom_data: {
@@ -330,6 +330,15 @@
     (function () {
         var depths = [25, 50, 75, 90];
         var tracked = {};
+        
+        // Generate a simple hash from the page URL for unique event IDs per page
+        var pageHash = 0;
+        var pageUrl = window.location.href;
+        for (var i = 0; i < pageUrl.length; i++) {
+            pageHash = ((pageHash << 5) - pageHash) + pageUrl.charCodeAt(i);
+            pageHash |= 0;
+        }
+        pageHash = Math.abs(pageHash);
 
         function checkScrollDepth() {
             var scrolled = (window.scrollY / (document.body.scrollHeight - window.innerHeight)) * 100;
@@ -341,7 +350,7 @@
                     var scrollEvent = {
                         event: 'up_event',
                         event_name: 'scroll_depth',
-                        event_id: 'scroll_' + depth, // deterministic per depth per page
+                        event_id: 'scroll_' + depth + '_' + pageHash,
                         event_time: Math.floor(Date.now() / 1000),
                         source_url: window.location.href,
                         custom_data: {
