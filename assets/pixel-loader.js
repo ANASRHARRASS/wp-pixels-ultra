@@ -14,7 +14,7 @@
         const c = window.UP_CONSENT || {};
         // expected possible keys: ads / marketing, analytics
         return {
-            ads: c.ads === true || c.marketing === true || typeof c.ads === 'undefined' && typeof c.marketing === 'undefined',
+            ads: (c.ads === true || c.marketing === true) || (typeof c.ads === 'undefined' && typeof c.marketing === 'undefined'),
             analytics: c.analytics === true || typeof c.analytics === 'undefined'
         };
     }
