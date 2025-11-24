@@ -122,7 +122,8 @@ class UP_Settings {
                     case 'snapchat_api_token':
                     case 'pinterest_access_token':
                         // Preserve token characters but remove dangerous whitespace/control chars
-                        $out[ $key ] = preg_replace( '/[^\x20-\x7E]/', '', trim( $val ) );
+                        // Allow alphanumeric, plus, slash, equals, underscore, hyphen (common in tokens)
+                        $out[ $key ] = preg_replace( '/[^A-Za-z0-9+\/=_-]/', '', trim( $val ) );
                         break;
                     case 'google_ads_label':
                         $out[ $key ] = sanitize_text_field( trim( $val ) );
