@@ -51,7 +51,30 @@ class WPU_Provider_Manager {
         }
         set_transient( $key, $entry, 70 );
 
-        $cache_key = 'wpu_prov_' . $id . '_' . md5( wp_json_encode( $params ) );
+        // Sanitize params to avoid injection via add_query_arg and for consistent caching keys
+        $safe_params = [];
+        if ( is_array( $params ) ) {
+            foreach ( $params as $k => $v ) {
+                // only allow simple keys
+                $k = preg_replace( '/[^A-Za-z0-9_\-]/', '', (string) $k );
+                if ( $k === '' ) continue;
+                if ( is_array( $v ) || is_object( $v ) ) continue;
+                if ( is_string( $v ) ) {
+                    $v = trim( $v );
+                    $v = sanitize_text_field( $v );
+                } else {
+                    $v = (string) $v;
+                }
+                // normalize email if present
+                if ( strtolower( $k ) === 'email' ) {
+                    $email = sanitize_email( $v );
+                    if ( $email ) $v = strtolower( $email );
+                }
+                $safe_params[ $k ] = $v;
+            }
+        }
+
+        $cache_key = 'wpu_prov_' . $id . '_' . md5( wp_json_encode( $safe_params ) );
         $cached = get_transient( $cache_key );
         if ( $cached ) return $cached;
 
@@ -65,7 +88,8 @@ class WPU_Provider_Manager {
             'timeout' => 12,
         ];
 
-        $url = add_query_arg( $params, $endpoint );
+        // Build URL with sanitized params only
+        $url = empty( $safe_params ) ? $endpoint : add_query_arg( $safe_params, $endpoint );
         $response = wp_remote_get( $url, $args );
         if ( is_wp_error( $response ) ) return $response;
 
