@@ -232,12 +232,22 @@ class UP_REST_Ingest {
     }
 
     protected static function get_client_ip( $request ) {
-        $xff = $request->get_header( 'x-forwarded-for' );
-        if ( $xff ) {
-            $parts = explode( ',', $xff );
-            if ( ! empty( $parts ) ) return trim( sanitize_text_field( $parts[0] ) );
-        }
         $remote = $_SERVER['REMOTE_ADDR'] ?? '';
+
+        // Only trust X-Forwarded-For if explicitly configured (e.g., behind CloudFlare/proxy)
+        if ( defined( 'UP_TRUST_PROXY' ) && UP_TRUST_PROXY ) {
+            $xff = $request->get_header( 'x-forwarded-for' );
+            if ( $xff ) {
+                $parts = array_map( 'trim', explode( ',', $xff ) );
+                // Use the last (rightmost) IP which should be from the most recent proxy
+                $candidate_ip = end( $parts );
+                // Validate IP format
+                if ( filter_var( $candidate_ip, FILTER_VALIDATE_IP ) ) {
+                    $remote = $candidate_ip;
+                }
+            }
+        }
+
         return sanitize_text_field( $remote );
     }
 

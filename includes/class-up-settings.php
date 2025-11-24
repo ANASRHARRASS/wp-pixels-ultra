@@ -119,12 +119,12 @@ class UP_Settings {
                         $out[ $key ] = max( 1, intval( $val ) );
                         break;
                     case 'capi_token':
-                        // token-like values: sanitize_text_field then trim
-                        $out[ $key ] = sanitize_text_field( trim( $val ) );
-                        break;
-                    case 'google_ads_label':
                     case 'snapchat_api_token':
                     case 'pinterest_access_token':
+                        // Preserve token characters but remove dangerous whitespace/control chars
+                        $out[ $key ] = preg_replace( '/[^\x20-\x7E]/', '', trim( $val ) );
+                        break;
+                    case 'google_ads_label':
                         $out[ $key ] = sanitize_text_field( trim( $val ) );
                         break;
                     case 'capi_endpoint':

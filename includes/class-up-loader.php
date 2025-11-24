@@ -47,20 +47,11 @@ class UP_Loader {
                     'up-pixel-loader',
                     'UP_CONFIG',
                     array(
-                        'nonce'      => wp_create_nonce( 'wp_rest' ),
-                        'ingest_url' => esc_url_raw( rest_url( 'up/v1/ingest' ) ),
-                        // Add other config values as needed by pixel-loader.js
-                    )
-                );
-                // Localize UP_CONFIG for pixel-loader.js
-                wp_localize_script(
-                    'up-pixel-loader',
-                    'UP_CONFIG',
-                    array(
-                        'nonce'      => wp_create_nonce( 'wp_rest' ),
-                        'ingest_url' => esc_url_raw( rest_url( 'up/v1/ingest' ) ),
-                        'meta_pixel_id' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'meta_pixel_id', '' ) : '',
+                        'nonce'           => wp_create_nonce( 'wp_rest' ),
+                        'ingest_url'      => esc_url_raw( rest_url( 'up/v1/ingest' ) ),
+                        'meta_pixel_id'   => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'meta_pixel_id', '' ) : '',
                         'tiktok_pixel_id' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'tiktok_pixel_id', '' ) : '',
+                        // Add other config values as needed by pixel-loader.js
                     )
                 );
                 
