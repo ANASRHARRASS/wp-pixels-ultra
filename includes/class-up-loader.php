@@ -41,7 +41,17 @@ class UP_Loader {
             if ( defined( 'UP_PLUGIN_URL' ) ) {
                 // use the canonical assets path inside the plugin
                 wp_enqueue_script( 'up-pixel-loader', UP_PLUGIN_URL . 'assets/pixel-loader.js', array(), defined( 'UP_VERSION' ) ? UP_VERSION : false, true );
-                
+
+                // Localize UP_CONFIG for pixel-loader.js
+                wp_localize_script(
+                    'up-pixel-loader',
+                    'UP_CONFIG',
+                    array(
+                        'nonce'      => wp_create_nonce( 'wp_rest' ),
+                        'ingest_url' => esc_url_raw( rest_url( 'up/v1/ingest' ) ),
+                        // Add other config values as needed by pixel-loader.js
+                    )
+                );
                 // Localize UP_CONFIG for pixel-loader.js
                 wp_localize_script(
                     'up-pixel-loader',
