@@ -69,7 +69,7 @@ class UP_Settings {
             'google_ads_id'     => '',
             'google_ads_label'  => '',
             'snapchat_pixel_id' => '',
-            'snapchat_api_token'=> '',
+            'snapchat_api_token' => '',
             'pinterest_tag_id'  => '',
             'pinterest_access_token' => '',
             'gtm_manage_pixels' => 'no',
