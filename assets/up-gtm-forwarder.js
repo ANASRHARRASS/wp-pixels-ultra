@@ -1,20 +1,20 @@
 (function (window) {
   'use strict';
 
-  var cfg = window.UP_CONFIG || {};
-  var ingestUrl = cfg.ingest_url || (window.location.origin + '/wp-json/up/v1/ingest');
-  var wpNonce = cfg.wp_nonce || (window.wpApiSettings && window.wpApiSettings.nonce) || null;
+  const cfg = window.UP_CONFIG || {};
+  const ingestUrl = cfg.ingest_url || (window.location.origin + '/wp-json/up/v1/ingest');
+  const wpNonce = cfg.wp_nonce || (window.wpApiSettings && window.wpApiSettings.nonce) || null;
 
   function sendToIngest(payload) {
     try {
-      var body = JSON.stringify(payload);
-      var headers = { 'Content-Type': 'application/json' };
+      const body = JSON.stringify(payload);
+      const headers = { 'Content-Type': 'application/json' };
       if (wpNonce) headers['X-WP-Nonce'] = wpNonce;
 
       // Prefer sendBeacon for navigation reliability; server accepts same-origin without nonce
       if (navigator && navigator.sendBeacon) {
         try {
-          var blob = new Blob([body], { type: 'application/json' });
+          const blob = new Blob([body], { type: 'application/json' });
           navigator.sendBeacon(ingestUrl, blob);
           return;
         } catch (e) { /* fallback to fetch */ }

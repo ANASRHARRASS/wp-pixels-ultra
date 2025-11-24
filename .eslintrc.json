@@ -40,8 +40,10 @@
   },
   "globals": {
     "UP_CONFIG": "readonly",
+    "UPAdmin": "readonly",
     "wp": "readonly",
     "jQuery": "readonly",
-    "_": "readonly"
+    "_": "readonly",
+    "dataLayer": "writable"
   }
 }

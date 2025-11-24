@@ -3,89 +3,81 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 class UP_REST {
     public static function register_routes() {
+        // Admin endpoints requiring manage_options capability
+        $admin_permission = function() {
+            return current_user_can( 'manage_options' );
+        };
 
-            $retry_after = max( 1, intval( UP_Settings::get( 'retry_after_seconds', 60 ) ) );
-        }
-        $ip_count = intval( get_transient( $ip_key ) );
-        $ip_count++;
-        set_transient( $ip_key, $ip_count, $retry_after );
-        if ( $ip_count > $ip_limit ) {
-            if ( class_exists( 'UP_CAPI' ) ) {
-                UP_CAPI::log( 'warn', sprintf( 'Rate-limited ingest by IP %s (%d/%d)', $ip, $ip_count, $ip_limit ) );
-            }
-            $resp = new WP_REST_Response( array( 'error' => 'rate_limited', 'scope' => 'ip', 'limit' => $ip_limit ), 429 );
-            $resp->header( 'Retry-After', $retry_after );
-            return $resp;
-        }
+        // Test event endpoint
+        register_rest_route( 'up/v1', '/test', array(
+            'methods'             => 'POST',
+            'callback'            => array( __CLASS__, 'test_forward' ),
+            'permission_callback' => $admin_permission,
+        ) );
 
-        if ( ! empty( $incoming_secret ) ) {
-            $tok_key = 'up_ingest_tok_' . md5( $incoming_secret );
-            $tok_limit = 600;
-            if ( class_exists( 'UP_Settings' ) ) {
-                $tok_limit = intval( UP_Settings::get( 'rate_limit_token_per_min', 600 ) );
-            }
-            $tok_count = intval( get_transient( $tok_key ) );
-            $tok_count++;
-            set_transient( $tok_key, $tok_count, $retry_after );
-            if ( $tok_count > $tok_limit ) {
-                if ( class_exists( 'UP_CAPI' ) ) {
-                    UP_CAPI::log( 'warn', sprintf( 'Rate-limited ingest by token %s (%d/%d)', substr( $incoming_secret, 0, 8 ), $tok_count, $tok_limit ) );
-                }
-                $resp = new WP_REST_Response( array( 'error' => 'rate_limited', 'scope' => 'token', 'limit' => $tok_limit ), 429 );
-                $resp->header( 'Retry-After', $retry_after );
-                return $resp;
-            }
-        }
+        // Queue management endpoints
+        register_rest_route( 'up/v1', '/process-queue', array(
+            'methods'             => 'POST',
+            'callback'            => array( __CLASS__, 'process_queue' ),
+            'permission_callback' => $admin_permission,
+        ) );
 
-        $payload = $request->get_json_params();
-        if ( empty( $payload ) || ! is_array( $payload ) ) {
-            return new WP_REST_Response( array( 'error' => 'Empty or invalid payload' ), 400 );
-        }
+        register_rest_route( 'up/v1', '/queue/status', array(
+            'methods'             => 'GET',
+            'callback'            => array( __CLASS__, 'queue_status' ),
+            'permission_callback' => $admin_permission,
+        ) );
 
-        // Optional consent check (if client provides consent flag and it's false, reject)
-        if ( isset( $payload['consent'] ) && $payload['consent'] !== true && $payload['consent'] !== 'true' ) {
-            return new WP_REST_Response( array( 'error' => 'Consent required' ), 403 );
-        }
+        register_rest_route( 'up/v1', '/queue/items', array(
+            'methods'             => 'GET',
+            'callback'            => array( __CLASS__, 'queue_items' ),
+            'permission_callback' => $admin_permission,
+        ) );
 
-        // Server-side PII hashing: convert email/phone to hashed fields and remove raw values
-        if ( isset( $payload['user_data'] ) && is_array( $payload['user_data'] ) ) {
-            $ud = $payload['user_data'];
-            $clean = array();
-            foreach ( $ud as $k => $v ) {
-                if ( in_array( $k, array( 'email', 'phone' ), true ) && is_string( $v ) ) {
-                    $val = strtolower( trim( wp_unslash( $v ) ) );
-                    $clean[ $k . '_hash' ] = hash( 'sha256', $val );
-                } else {
-                    $clean[ $k ] = $v;
-                }
-            }
-            $payload['user_data'] = $clean;
-        }
+        register_rest_route( 'up/v1', '/queue/retry', array(
+            'methods'             => 'POST',
+            'callback'            => array( __CLASS__, 'queue_retry' ),
+            'permission_callback' => $admin_permission,
+        ) );
 
-        // Normalize optional source URL for adapters
-        if ( empty( $payload['source_url'] ) ) {
-            $payload['source_url'] = isset( $_SERVER['HTTP_REFERER'] ) ? esc_url_raw( wp_unslash( $_SERVER['HTTP_REFERER'] ) ) : home_url();
-        }
+        register_rest_route( 'up/v1', '/queue/delete', array(
+            'methods'             => 'POST',
+            'callback'            => array( __CLASS__, 'queue_delete' ),
+            'permission_callback' => $admin_permission,
+        ) );
 
-        // Normalize platform and event_name
-        $platform = isset( $payload['platform'] ) ? sanitize_text_field( $payload['platform'] ) : 'generic';
-        $event_name = isset( $payload['event_name'] ) ? sanitize_text_field( $payload['event_name'] ) : ( isset( $payload['event'] ) ? sanitize_text_field( $payload['event'] ) : 'event' );
+        // Dead-letter endpoints
+        register_rest_route( 'up/v1', '/queue/deadletter', array(
+            'methods'             => 'GET',
+            'callback'            => array( __CLASS__, 'deadletter_items' ),
+            'permission_callback' => $admin_permission,
+        ) );
 
-        // Accept optional client-supplied event_id (sanitized) for idempotency
-        if ( isset( $payload['event_id'] ) && is_string( $payload['event_id'] ) ) {
-            $payload['event_id'] = substr( sanitize_text_field( $payload['event_id'] ), 0, 64 );
-        }
+        register_rest_route( 'up/v1', '/queue/deadletter/retry', array(
+            'methods'             => 'POST',
+            'callback'            => array( __CLASS__, 'deadletter_retry' ),
+            'permission_callback' => $admin_permission,
+        ) );
 
-        // Enqueue event for async processing using UP_CAPI
-        if ( class_exists( 'UP_CAPI' ) && method_exists( 'UP_CAPI', 'enqueue_event' ) ) {
-            $ok = UP_CAPI::enqueue_event( $platform, $event_name, $payload );
-            if ( $ok ) {
-                return new WP_REST_Response( array( 'ok' => true, 'queued' => true, 'event_id' => isset( $payload['event_id'] ) ? $payload['event_id'] : null ), 202 );
-            }
-            return new WP_REST_Response( array( 'ok' => false, 'error' => 'enqueue_failed' ), 500 );
-        }
+        register_rest_route( 'up/v1', '/queue/deadletter/delete', array(
+            'methods'             => 'POST',
+            'callback'            => array( __CLASS__, 'deadletter_delete' ),
+            'permission_callback' => $admin_permission,
+        ) );
 
-        return new WP_REST_Response( array( 'ok' => false, 'error' => 'capi_unavailable' ), 500 );
+        // Logs endpoint
+        register_rest_route( 'up/v1', '/logs', array(
+            'methods'             => 'GET',
+            'callback'            => array( __CLASS__, 'logs' ),
+            'permission_callback' => $admin_permission,
+        ) );
+
+        // Health endpoint (public, no authentication required)
+        register_rest_route( 'up/v1', '/health', array(
+            'methods'             => 'GET',
+            'callback'            => array( __CLASS__, 'health' ),
+            'permission_callback' => '__return_true',
+        ) );
     }
 
     public static function test_forward( WP_REST_Request $request ) {
