@@ -153,7 +153,7 @@ The GTM Server Forwarder routes all server-side events through your GTM server-s
    - Set **GTM Server Container URL**: `https://your-gtm-server.com`
    - Enable **Use GTM Server for Event Forwarding**: Yes
    - Enter pixel IDs for each platform (these will be sent to GTM)
-   - Optionally add platform API tokens (GTM will use these for API calls)
+   - Optionally add platform API tokens (only used if GTM forwarding is disabled; not sent to GTM)
    - Save changes
 
 3. **Configure GTM Server Container**
@@ -178,18 +178,14 @@ The GTM Server Forwarder routes all server-side events through your GTM server-s
          "snapchat_pixel_id": "...",
          "pinterest_tag_id": "..."
        },
-       "tokens": {
-         "capi_token": "...",
-         "snapchat_api_token": "...",
-         "pinterest_access_token": "..."
-       },
        "source": "wordpress",
        "site_url": "https://example.com",
        "timestamp": 1234567890
      }
      ```
+   - **Note:** Sensitive platform tokens (such as `capi_token`, `snapchat_api_token`, and `pinterest_access_token`) are **not** included in the payload for security reasons. You must configure these tokens directly in your GTM server container environment or tag settings.
    - Route events to appropriate platform tags based on `platform` field
-   - Use provided tokens and pixel IDs for platform API calls
+   - Use provided pixel IDs for platform API calls
 
 4. **Test the Integration**
    - Trigger a test event (e.g., add to cart)

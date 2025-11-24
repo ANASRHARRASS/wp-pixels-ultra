@@ -255,9 +255,9 @@ The `UP_GTM_FORWARD()` function accepts this payload structure:
   event_id: 'unique-event-id-for-deduplication',
   event_time: 1234567890, // Unix timestamp
   user_data: {
-    email: 'user@example.com', // Will be hashed server-side
-    phone: '+1234567890', // Will be hashed server-side
-    // Do NOT include pre-hashed values
+    email: 'user@example.com', // Will be stripped client-side (never sent to server)
+    phone: '+1234567890', // Will be stripped client-side (never sent to server)
+    // Do NOT include pre-hashed values. If you require server-side hashing, hash PII client-side before calling the forwarder.
   },
   custom_data: {
     value: 99.99,
@@ -447,7 +447,7 @@ Respect user consent before forwarding:
 2. **PII Handling**
    - You can send raw PII (email, phone) from GTM to the forwarder function
    - The forwarder script automatically strips raw PII fields before sending to WordPress
-   - WordPress server never receives raw PII in this flow (privacy by design)
+   - The WordPress server never receives raw PII when using the GTM client-side forwarder (privacy by design). However, if you send events directly to `/wp-json/up/v1/ingest` (e.g., via custom code), raw PII may be sent to the server for server-side hashing.
    - If you need server-side hashed PII (email_hash, phone_hash), hash the values client-side in GTM before calling `UP_GTM_FORWARD()`
 
 3. **Error Handling**

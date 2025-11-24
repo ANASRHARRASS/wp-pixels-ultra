@@ -42,6 +42,18 @@ class UP_Loader {
                 // use the canonical assets path inside the plugin
                 wp_enqueue_script( 'up-pixel-loader', UP_PLUGIN_URL . 'assets/pixel-loader.js', array(), defined( 'UP_VERSION' ) ? UP_VERSION : false, true );
                 
+                // Localize UP_CONFIG for pixel-loader.js
+                wp_localize_script(
+                    'up-pixel-loader',
+                    'UP_CONFIG',
+                    array(
+                        'nonce'      => wp_create_nonce( 'wp_rest' ),
+                        'ingest_url' => esc_url_raw( rest_url( 'up/v1/ingest' ) ),
+                        'meta_pixel_id' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'meta_pixel_id', '' ) : '',
+                        'tiktok_pixel_id' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'tiktok_pixel_id', '' ) : '',
+                    )
+                );
+                
                 // Enqueue GTM forwarder script for client-side GTM integration
                 // Only load if GTM is configured or any platform is enabled
                 $should_load_forwarder = false;
@@ -59,7 +71,7 @@ class UP_Loader {
                     
                     wp_localize_script( 'up-gtm-forwarder', 'UP_CONFIG', array(
                         'ingest_url' => esc_url_raw( rest_url( 'up/v1/ingest' ) ),
-                        'wp_nonce'   => wp_create_nonce( 'wp_rest' ),
+                        'nonce'   => wp_create_nonce( 'wp_rest' ),
                         'gtm_id'     => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'gtm_container_id', '' ) : '',
                         'gtm_server_url' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'gtm_server_url', '' ) : '',
                         'meta_pixel_id' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'meta_pixel_id', '' ) : '',

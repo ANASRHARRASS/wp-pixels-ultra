@@ -1,14 +1,14 @@
 (function (window) {
   'use strict';
 
-  var cfg = window.UP_CONFIG || {};
-  var ingestUrl = cfg.ingest_url || (window.location.origin + '/wp-json/up/v1/ingest');
-  var wpNonce = cfg.wp_nonce || (window.wpApiSettings && window.wpApiSettings.nonce) || null;
+  const cfg = window.UP_CONFIG || {};
+  const ingestUrl = cfg.ingest_url || (window.location.origin + '/wp-json/up/v1/ingest');
+  const wpNonce = cfg.wp_nonce || (window.wpApiSettings && window.wpApiSettings.nonce) || null;
 
   function sendToIngest(payload) {
     try {
-      var body = JSON.stringify(payload);
-      var headers = { 'Content-Type': 'application/json' };
+      const body = JSON.stringify(payload);
+      const headers = { 'Content-Type': 'application/json' };
       if (wpNonce) headers['X-WP-Nonce'] = wpNonce;
 
       // Always use fetch with keepalive for reliability and to ensure X-WP-Nonce is sent.
@@ -35,14 +35,14 @@
       try {
         if (!evt || typeof evt !== 'object') return;
         
-        // Create a shallow copy to avoid mutating caller's data
-        var normalizedEvt = Object.assign({}, evt);
+        // Create a deep copy to avoid mutating caller's data
+        const normalizedEvt = JSON.parse(JSON.stringify(evt));
         
         // Normalize GTM alias: support evt.user but prefer evt.user_data
         if (evt.user && !evt.user_data) {
-          normalizedEvt.user_data = Object.assign({}, evt.user);
+          normalizedEvt.user_data = JSON.parse(JSON.stringify(evt.user));
         } else if (evt.user_data) {
-          normalizedEvt.user_data = Object.assign({}, evt.user_data);
+          normalizedEvt.user_data = JSON.parse(JSON.stringify(evt.user_data));
         }
         
         // Remove raw PII for privacy; these fields are not sent to the server

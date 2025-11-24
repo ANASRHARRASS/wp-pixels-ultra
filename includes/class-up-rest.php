@@ -320,8 +320,9 @@ class UP_REST {
         if ( class_exists( 'UP_CAPI' ) ) {
             $queue_len = UP_CAPI::get_queue_length();
             global $wpdb; $dl_table = $wpdb->prefix . 'up_capi_deadletter';
-            if ( $wpdb->get_var( "SHOW TABLES LIKE '{$dl_table}'" ) === $dl_table ) {
-                $deadletter_len = intval( $wpdb->get_var( "SELECT COUNT(1) FROM {$dl_table}" ) );
+            $dl_table_esc = esc_sql( $dl_table );
+            if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $dl_table ) ) === $dl_table ) {
+                $deadletter_len = intval( $wpdb->get_var( "SELECT COUNT(1) FROM {$dl_table_esc}" ) );
             }
         }
         $platforms = array();
