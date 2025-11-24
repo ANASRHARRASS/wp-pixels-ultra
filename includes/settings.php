@@ -35,6 +35,16 @@ class WPU_Provider_Settings {
     }
 
     public static function sanitize( $input ) {
+        // Support both legacy array submission and JSON textarea input.
+        if ( is_string( $input ) ) {
+            $decoded = json_decode( $input, true );
+            if ( json_last_error() !== JSON_ERROR_NONE ) {
+                add_settings_error( 'wpu_providers_group', 'wpu_json_parse_error', 'Providers JSON is invalid: ' . json_last_error_msg(), 'error' );
+                return [];
+            }
+            $input = $decoded;
+        }
+
         if ( ! is_array( $input ) ) {
             return [];
         }
