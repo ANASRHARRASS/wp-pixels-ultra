@@ -11,14 +11,8 @@
       var headers = { 'Content-Type': 'application/json' };
       if (wpNonce) headers['X-WP-Nonce'] = wpNonce;
 
-      // Prefer sendBeacon for navigation reliability; server accepts same-origin without nonce
-      if (navigator && navigator.sendBeacon) {
-        try {
-          var blob = new Blob([body], { type: 'application/json' });
-          navigator.sendBeacon(ingestUrl, blob);
-          return;
-        } catch (e) { /* fallback to fetch */ }
-      }
+      // Always use fetch with keepalive for reliability and to ensure X-WP-Nonce is sent.
+      // navigator.sendBeacon does not support custom headers, so cannot be used for authenticated requests.
 
       fetch(ingestUrl, {
         method: 'POST',
