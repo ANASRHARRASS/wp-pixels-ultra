@@ -45,7 +45,7 @@ Browser/GTM Client → WordPress /wp-json/up/v1/ingest → Platform APIs
 
 ### Step 2: Verify Forwarder Script Loaded
 
-The plugin automatically loads `gtm-forwarder.js` which provides the `window.UP_GTM_FORWARD()` function.
+The plugin automatically loads `up-gtm-forwarder.js` which provides the `window.UP_GTM_FORWARD()` function.
 
 To verify it's loaded, open your website and check the browser console:
 ```javascript
@@ -255,9 +255,9 @@ The `UP_GTM_FORWARD()` function accepts this payload structure:
   event_id: 'unique-event-id-for-deduplication',
   event_time: 1234567890, // Unix timestamp
   user_data: {
-    email: 'user@example.com', // Will be hashed server-side
-    phone: '+1234567890', // Will be hashed server-side
-    // Do NOT include pre-hashed values
+    email: 'user@example.com', // Will be stripped client-side (never sent to server)
+    phone: '+1234567890', // Will be stripped client-side (never sent to server)
+    // Do NOT include pre-hashed values. If you require server-side hashing, hash PII client-side before calling the forwarder.
   },
   custom_data: {
     value: 99.99,
@@ -271,7 +271,7 @@ The `UP_GTM_FORWARD()` function accepts this payload structure:
 ```
 
 **Important Notes:**
-- **PII Handling**: Send raw email/phone in `user_data`. The forwarder script removes them before sending to WordPress, and the WordPress plugin handles proper hashing server-side.
+- **PII Handling**: Send raw email/phone in `user_data`. The forwarder script automatically removes these PII fields before sending to WordPress as a privacy feature. **Note:** The statement "The WordPress server never receives raw PII in this flow" applies only to the GTM client-side forwarder. If you use direct REST API calls to `/wp-json/up/v1/ingest` (such as from `pixel-loader.js`), the server does receive raw PII and hashes it server-side. If you require server-side PII hashing, you must hash the PII client-side in GTM before calling the forwarder function.
 - **Event IDs**: Use deterministic IDs for purchases (`order_{{Order ID}}`) to enable proper deduplication between client and server events.
 - **Platform Names**: Use lowercase platform identifiers: `meta`, `tiktok`, `google_ads`, `snapchat`, `pinterest`.
 
@@ -445,9 +445,10 @@ Respect user consent before forwarding:
    - Use unique random IDs for other events: `ev_{{Timestamp}}_{{Random}}`
 
 2. **PII Handling**
-   - Always send raw PII (email, phone) from GTM
-   - Never hash PII client-side
-   - Let WordPress plugin handle server-side hashing
+   - You can send raw PII (email, phone) from GTM to the forwarder function
+   - The forwarder script automatically strips raw PII fields before sending to WordPress
+   - The WordPress server never receives raw PII when using the GTM client-side forwarder (privacy by design). However, if you send events directly to `/wp-json/up/v1/ingest` (e.g., via custom code), raw PII may be sent to the server for server-side hashing.
+   - If you need server-side hashed PII (email_hash, phone_hash), hash the values client-side in GTM before calling `UP_GTM_FORWARD()`
 
 3. **Error Handling**
    - Wrap forwarding calls in try-catch

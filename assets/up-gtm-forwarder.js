@@ -1,14 +1,14 @@
 (function (window) {
   'use strict';
 
-  var cfg = window.UP_CONFIG || {};
-  var ingestUrl = cfg.ingest_url || (window.location.origin + '/wp-json/up/v1/ingest');
-  var wpNonce = cfg.wp_nonce || (window.wpApiSettings && window.wpApiSettings.nonce) || null;
+  const cfg = window.UP_CONFIG || {};
+  const ingestUrl = cfg.ingest_url || (window.location.origin + '/wp-json/up/v1/ingest');
+  const wpNonce = cfg.wp_nonce || (window.wpApiSettings && window.wpApiSettings.nonce) || null;
 
   function sendToIngest(payload) {
     try {
-      var body = JSON.stringify(payload);
-      var headers = { 'Content-Type': 'application/json' };
+      const body = JSON.stringify(payload);
+      const headers = { 'Content-Type': 'application/json' };
       if (wpNonce) headers['X-WP-Nonce'] = wpNonce;
 
       // Always use fetch with keepalive for reliability and to ensure X-WP-Nonce is sent.
@@ -34,18 +34,26 @@
     window.UP_GTM_FORWARD = function (evt) {
       try {
         if (!evt || typeof evt !== 'object') return;
+        
+        // Create a deep copy to avoid mutating caller's data
+        const normalizedEvt = JSON.parse(JSON.stringify(evt));
+        
         // Normalize GTM alias: support evt.user but prefer evt.user_data
         if (evt.user && !evt.user_data) {
-          evt.user_data = evt.user;
+          normalizedEvt.user_data = JSON.parse(JSON.stringify(evt.user));
+        } else if (evt.user_data) {
+          normalizedEvt.user_data = JSON.parse(JSON.stringify(evt.user_data));
         }
-        // Remove raw PII coming from GTM; server will handle hashing
-        if (evt.user_data) {
-          if (evt.user_data.email) delete evt.user_data.email;
-          if (evt.user_data.phone) delete evt.user_data.phone;
-          if (evt.user_data.phone_number) delete evt.user_data.phone_number;
+        
+        // Remove raw PII for privacy; these fields are not sent to the server
+        if (normalizedEvt.user_data && typeof normalizedEvt.user_data === 'object') {
+          delete normalizedEvt.user_data.email;
+          delete normalizedEvt.user_data.phone;
+          delete normalizedEvt.user_data.phone_number;
         }
-        if (!evt.event) evt.event = evt.event_name || 'custom_event';
-        sendToIngest(evt);
+        
+        if (!normalizedEvt.event) normalizedEvt.event = normalizedEvt.event_name || 'custom_event';
+        sendToIngest(normalizedEvt);
       } catch (e) {
         if (window.console) console.error('UP_GTM_FORWARD exception', e);
       }
