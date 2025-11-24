@@ -43,11 +43,13 @@ class UP_Loader {
                 wp_enqueue_script( 'up-pixel-loader', UP_PLUGIN_URL . 'assets/pixel-loader.js', array(), defined( 'UP_VERSION' ) ? UP_VERSION : false, true );
                 
                 // Localize UP_CONFIG for pixel-loader.js
+                $nonce = wp_create_nonce( 'wp_rest' );
                 wp_localize_script(
                     'up-pixel-loader',
                     'UP_CONFIG',
                     array(
-                        'nonce'      => wp_create_nonce( 'wp_rest' ),
+                        'nonce'      => $nonce,
+                        'wp_nonce'   => $nonce, // Backward compatibility for GTM forwarder
                         'ingest_url' => esc_url_raw( rest_url( 'up/v1/ingest' ) ),
                         'gtm_id'     => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'gtm_container_id', '' ) : '',
                         'gtm_server_url' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'gtm_server_url', '' ) : '',
