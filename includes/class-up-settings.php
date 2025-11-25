@@ -1,9 +1,23 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) {
-	exit; }
+	exit;
+}
 
+/**
+ * UP_Settings
+ *
+ * Settings helper: defaults, sanitization and simple getters/setters for plugin options.
+ *
+ * @package WP_Pixels_Ultra
+ */
 class UP_Settings {
-	// Replace previous simple register with structured settings, sanitization and defaults
+	/**
+	 * Initialize settings registration.
+	 *
+	 * Registers the settings group and sanitization callback.
+	 *
+	 * @return void
+	 */
 	public static function init() {
 		register_setting(
 			'up_settings_group',
@@ -12,6 +26,11 @@ class UP_Settings {
 		);
 	}
 
+	/**
+	 * Get default settings.
+	 *
+	 * @return array Default settings array.
+	 */
 	public static function defaults() {
 		$default_mappings = array(
 			'purchase'          => array(
@@ -189,19 +208,25 @@ class UP_Settings {
 		);
 	}
 
+	/**
+	 * Sanitize settings input before saving.
+	 *
+	 * @param mixed $input Incoming raw settings value.
+	 * @return array Sanitized settings array.
+	 */
 	public static function sanitize_callback( $input ) {
 		$defaults = self::defaults();
 		$out      = $defaults;
 		if ( ! is_array( $input ) ) {
 			return $out;
 		}
-		// whitelist and sanitize known keys
+		// Whitelist and sanitize known keys.
 		foreach ( $defaults as $key => $default ) {
 			if ( isset( $input[ $key ] ) ) {
 				$val = $input[ $key ];
 				switch ( $key ) {
 					case 'tracking_mode':
-						$out[ $key ] = ( $val === 'pure_s2s' ) ? 'pure_s2s' : 'hybrid';
+						$out[ $key ] = ( 'pure_s2s' === $val ) ? 'pure_s2s' : 'hybrid';
 						break;
 					case 'enable_gtm':
 					case 'enable_meta':
@@ -211,7 +236,7 @@ class UP_Settings {
 					case 'enable_pinterest':
 					case 'gtm_manage_pixels':
 					case 'use_gtm_forwarder':
-						$out[ $key ] = ( $val === 'yes' ) ? 'yes' : 'no';
+						$out[ $key ] = ( 'yes' === $val ) ? 'yes' : 'no';
 						break;
 					case 'rate_limit_ip_per_min':
 					case 'rate_limit_token_per_min':
@@ -219,7 +244,7 @@ class UP_Settings {
 						$out[ $key ] = max( 1, intval( $val ) );
 						break;
 					case 'capi_token':
-						// token-like values: sanitize_text_field then trim
+						// Token-like values: sanitize_text_field then trim.
 						$out[ $key ] = sanitize_text_field( trim( $val ) );
 						break;
 					case 'google_ads_label':
@@ -253,6 +278,13 @@ class UP_Settings {
 		return $out;
 	}
 
+	/**
+	 * Retrieve a single plugin setting.
+	 *
+	 * @param string $key     Option key to retrieve.
+	 * @param mixed  $default Default value if option not set.
+	 * @return mixed Option value or default.
+	 */
 	public static function get( $key, $default = '' ) {
 		$opts     = get_option( 'up_settings', array() );
 		$defaults = self::defaults();
@@ -260,6 +292,13 @@ class UP_Settings {
 		return isset( $opts[ $key ] ) ? $opts[ $key ] : $default;
 	}
 
+	/**
+	 * Update a single plugin setting.
+	 *
+	 * @param string $key   Option key to update.
+	 * @param mixed  $value Value to store.
+	 * @return void
+	 */
 	public static function update( $key, $value ) {
 		$opts = get_option( 'up_settings', array() );
 		if ( ! is_array( $opts ) ) {
@@ -270,6 +309,13 @@ class UP_Settings {
 	}
 
 	// Backwards compatible page renderer. Admin class will call this.
+	/**
+	 * Render the settings page (backwards compatible).
+	 *
+	 * Uses the WP Settings API for form submission and nonce handling.
+	 *
+	 * @return void
+	 */
 	public static function render_page() {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
@@ -277,7 +323,7 @@ class UP_Settings {
 		$opts = get_option( 'up_settings', array() );
 		$opts = wp_parse_args( $opts, self::defaults() );
 
-		// Use the WP Settings API form action target and nonce is handled by settings_fields()
+		// Use the WP Settings API form action target; nonce is handled by settings_fields().
 		?>
 		<div class="wrap">
 			<h1><?php echo esc_html__( 'Ultra Pixels Settings', 'ultra-pixels-ultra' ); ?></h1>
