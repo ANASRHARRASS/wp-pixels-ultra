@@ -1,14 +1,17 @@
 <?php
+/**
+ * Events handler: client data layer and server-side event routing.
+ *
+ * @package WP_Pixels_Ultra
+ */
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
-
 /**
- * UP_Events
+ * Class UP_Events.
  *
- * Handles client data layer pushes and server-side event routing for e-commerce events.
- *
- * @package WP_Pixels_Ultra
+ * Handles plugin event hooks and data-layer pushes.
  */
 class UP_Events {
 	/**
@@ -25,6 +28,11 @@ class UP_Events {
 		add_action( 'template_redirect', array( __CLASS__, 'maybe_view_item' ) );
 	}
 
+	/**
+	 * Get event mapping from settings.
+	 *
+	 * @return array Mapping configuration.
+	 */
 	protected static function get_mapping() {
 		$raw     = UP_Settings::get( 'event_mapping', '{}' );
 		$decoded = json_decode( $raw, true );
@@ -34,21 +42,27 @@ class UP_Events {
 		return array();
 	}
 
+	/**
+	 * Push a data layer event to the frontend.
+	 *
+	 * @param array $data Event data.
+	 * @return void
+	 */
 	public static function push_data_layer( $data = array() ) {
-		// Normalize to GTM custom event schema
+		// Normalize to GTM custom event schema.
 		if ( ! isset( $data['event'] ) ) {
 			$data['event'] = 'up_event';
 		}
-		// Backwards compatibility: if legacy 'event' value was the business event name, copy into event_name
-		if ( ! isset( $data['event_name'] ) && isset( $data['event'] ) && $data['event'] !== 'up_event' ) {
+		// Backwards compatibility: if legacy 'event' value was the business event name, copy into event_name.
+		if ( ! isset( $data['event_name'] ) && isset( $data['event'] ) && 'up_event' !== $data['event'] ) {
 			$data['event_name'] = $data['event'];
 		}
 
-		// Add Enhanced Ecommerce data for GA4 compatibility if not already present
+		// Add Enhanced Ecommerce data for GA4 compatibility if not already present.
 		if ( ! isset( $data['ecommerce'] ) && isset( $data['contents'] ) && is_array( $data['contents'] ) ) {
 			$ecommerce = array();
 
-			// Build items array in GA4 format
+			// Build items array in GA4 format.
 			$items = array();
 			foreach ( $data['contents'] as $content ) {
 				$item = array(
@@ -56,7 +70,7 @@ class UP_Events {
 					'quantity' => isset( $content['quantity'] ) ? intval( $content['quantity'] ) : 1,
 					'price'    => isset( $content['item_price'] ) ? (float) $content['item_price'] : 0,
 				);
-				// Add product name if available
+				// Add product name if available.
 				if ( isset( $content['name'] ) ) {
 					$item['item_name'] = $content['name'];
 				} elseif ( isset( $content['id'] ) && function_exists( 'wc_get_product' ) ) {
@@ -70,7 +84,7 @@ class UP_Events {
 
 			$ecommerce['items'] = $items;
 
-			// Add transaction-level data if available
+			// Add transaction-level data if available.
 			if ( isset( $data['transaction_id'] ) ) {
 				$ecommerce['transaction_id'] = (string) $data['transaction_id'];
 			}
@@ -84,7 +98,7 @@ class UP_Events {
 			$data['ecommerce'] = $ecommerce;
 		}
 
-		// Ensure event_time is set for server-side tracking
+		// Ensure event_time is set for server-side tracking.
 		if ( ! isset( $data['event_time'] ) ) {
 			$data['event_time'] = time();
 		}
@@ -92,6 +106,13 @@ class UP_Events {
 		echo '<script>window.dataLayer = window.dataLayer || []; window.dataLayer.push(' . wp_json_encode( $data ) . ');</script>';
 	}
 
+	/**
+	 * Send a normalized payload to configured CAPI platforms.
+	 *
+	 * @param string $event_key Event key.
+	 * @param array  $payload   Payload to send.
+	 * @return void
+	 */
 	public static function send_to_capi_for_platforms( $event_key, $payload ) {
 		$map                 = self::get_mapping();
 		$supported_platforms = array( 'meta', 'tiktok', 'google_ads', 'snapchat', 'pinterest' );
@@ -112,7 +133,7 @@ class UP_Events {
 			if ( in_array( $platform, $supported_platforms, true ) ) {
 				$event_name = isset( $cfg['event_name'] ) ? $cfg['event_name'] : ( isset( $cfg['event'] ) ? $cfg['event'] : ucfirst( $event_key ) );
 
-				// Check if platform is enabled.
+					// Check if platform is enabled.
 				$enable_key = 'enable_' . $platform;
 				if ( 'yes' === UP_Settings::get( $enable_key, 'no' ) ) {
 					if ( method_exists( 'UP_CAPI', 'enqueue_event' ) ) {
@@ -125,6 +146,12 @@ class UP_Events {
 		}
 	}
 
+	/**
+	 * Handle a purchase event (WC thankyou hook).
+	 *
+	 * @param int $order_id Order ID.
+	 * @return void
+	 */
 	public static function on_purchase( $order_id ) {
 		if ( ! function_exists( 'wc_get_order' ) ) {
 			return;
@@ -170,6 +197,11 @@ class UP_Events {
 		self::send_to_capi_for_platforms( 'purchase', $payload );
 	}
 
+	/**
+	 * Handle add-to-cart events.
+	 *
+	 * @return void
+	 */
 	public static function on_add_to_cart() {
 		$args       = func_get_args();
 		$product_id = isset( $args[1] ) ? intval( $args[1] ) : ( isset( $args[0] ) ? intval( $args[0] ) : 0 );
@@ -198,6 +230,11 @@ class UP_Events {
 		}
 	}
 
+	/**
+	 * Handle begin checkout events.
+	 *
+	 * @return void
+	 */
 	public static function on_begin_checkout() {
 		if ( ! function_exists( 'WC' ) ) {
 			return;
@@ -235,8 +272,13 @@ class UP_Events {
 		self::send_to_capi_for_platforms( 'begin_checkout', $payload );
 	}
 
+	/**
+	 * Maybe push view_item or view_item_list events on frontend pages.
+	 *
+	 * @return void
+	 */
 	public static function maybe_view_item() {
-		// product single page
+		// product single page.
 		if ( function_exists( 'is_product' ) && is_product() ) {
 			$product_id = get_the_ID();
 			$product    = wc_get_product( $product_id );
@@ -264,7 +306,7 @@ class UP_Events {
 			return;
 		}
 
-		// product listing / shop / category
+		// product listing / shop / category.
 		if ( ( function_exists( 'is_shop' ) && is_shop() ) || ( function_exists( 'is_product_category' ) && is_product_category() ) ) {
 			$dl = array(
 				'event'      => 'up_event',
@@ -280,12 +322,18 @@ class UP_Events {
 			);
 
 			$payload = array(
-				'page_url' => home_url( add_query_arg( null, null ) ),
+				'page_url' => esc_url_raw( home_url( add_query_arg( null, null ) ) ),
 			);
 			self::send_to_capi_for_platforms( 'view_item_list', $payload );
 		}
 	}
 
+	/**
+	 * Get a hashed email identifier for an order.
+	 *
+	 * @param WC_Order $order Order object.
+	 * @return string SHA256 hash or empty string.
+	 */
 	protected static function get_order_email_hash( $order ) {
 		if ( method_exists( $order, 'get_billing_email' ) ) {
 			$email = $order->get_billing_email();
@@ -297,5 +345,5 @@ class UP_Events {
 	}
 }
 
-// initialize hooks when file loaded
+// Initialize hooks when file loaded.
 UP_Events::init();

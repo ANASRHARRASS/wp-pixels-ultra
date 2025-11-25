@@ -1,7 +1,9 @@
 <?php
 /**
  * REST ingest route for GTM/browser -> plugin server ingestion.
- * Registers POST /wp-json/up/v1/ingest and enqueues events via UP_CAPI::enqueue_event()
+ * Registers POST /wp-json/up/v1/ingest and enqueues events via UP_CAPI::enqueue_event().
+ *
+ * @package WP_Pixels_Ultra
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -46,32 +48,32 @@ class UP_REST_Ingest {
 	 * @return bool|WP_Error
 	 */
 	public static function permission_callback( $request ) {
-		// 1) Allow server secret if provided
+		// 1) Allow server secret if provided.
 		$incoming_secret = $request->get_header( 'x-up-secret' );
 		$stored_secret   = defined( 'UP_SERVER_SECRET' ) ? UP_SERVER_SECRET : ( class_exists( 'UP_Settings' ) ? UP_Settings::get( 'server_secret', '' ) : '' );
 		if ( ! empty( $incoming_secret ) && ! empty( $stored_secret ) && hash_equals( (string) $stored_secret, (string) $incoming_secret ) ) {
 			return true;
 		}
 
-		// 2) Accept valid REST nonce if present
+		// 2) Accept valid REST nonce if present.
 		$nonce = $request->get_header( 'x-wp-nonce' );
 		if ( ! empty( $nonce ) && wp_verify_nonce( $nonce, 'wp_rest' ) ) {
 			return true;
 		}
 
-		// 3) Same-origin anonymous fallback with rate limiting — check Origin/Referer host match
+		// 3) Same-origin anonymous fallback with rate limiting — check Origin/Referer host match.
 		$site_host = wp_parse_url( home_url(), PHP_URL_HOST );
 		$origin    = $request->get_header( 'origin' );
 		$referer   = $request->get_header( 'referer' );
 		$hdr       = $origin ? $origin : $referer;
 		if ( ! empty( $hdr ) ) {
 			$hdr_host = wp_parse_url( $hdr, PHP_URL_HOST );
-			if ( $hdr_host && $site_host && strcasecmp( $hdr_host, $site_host ) === 0 ) {
+			if ( $hdr_host && $site_host && 0 === strcasecmp( $hdr_host, $site_host ) ) {
 				return true;
 			}
 		}
 
-		return new WP_Error( 'rest_forbidden', __( 'Unauthorized ingest request.' ), array( 'status' => 401 ) );
+		return new WP_Error( 'rest_forbidden', __( 'Unauthorized ingest request.', 'wp-pixels-ultra' ), array( 'status' => 401 ) );
 	}
 
 	/**
@@ -83,10 +85,10 @@ class UP_REST_Ingest {
 	public static function ingest_event_callback( WP_REST_Request $request ) {
 		$params = $request->get_json_params();
 		if ( empty( $params ) || ! is_array( $params ) ) {
-			return new WP_Error( 'invalid_payload', __( 'Invalid JSON payload.' ), array( 'status' => 400 ) );
+			return new WP_Error( 'invalid_payload', __( 'Invalid JSON payload.', 'wp-pixels-ultra' ), array( 'status' => 400 ) );
 		}
 
-		// Basic rate limiting: per-IP and per-token (server secret) counters
+		// Basic rate limiting: per-IP and per-token (server secret) counters.
 		$retry_after = class_exists( 'UP_Settings' ) ? max( 1, intval( UP_Settings::get( 'retry_after_seconds', 60 ) ) ) : 60;
 		$ip_limit    = class_exists( 'UP_Settings' ) ? intval( UP_Settings::get( 'rate_limit_ip_per_min', 60 ) ) : 60;
 		$token_limit = class_exists( 'UP_Settings' ) ? intval( UP_Settings::get( 'rate_limit_token_per_min', 600 ) ) : 600;
@@ -129,28 +131,28 @@ class UP_REST_Ingest {
 			}
 		}
 
-		// Accept either 'event' or 'event_name'
+		// Accept either 'event' or 'event_name'.
 		if ( empty( $params['event'] ) && empty( $params['event_name'] ) ) {
-			return new WP_Error( 'missing_event_name', __( 'event or event_name is required.' ), array( 'status' => 400 ) );
+			return new WP_Error( 'missing_event_name', __( 'event or event_name is required.', 'wp-pixels-ultra' ), array( 'status' => 400 ) );
 		}
 		$event = sanitize_text_field( wp_unslash( $params['event'] ?? $params['event_name'] ) );
 
 		if ( empty( $params['event_id'] ) ) {
-			return new WP_Error( 'missing_event_id', __( 'event_id is required.' ), array( 'status' => 400 ) );
+			return new WP_Error( 'missing_event_id', __( 'event_id is required.', 'wp-pixels-ultra' ), array( 'status' => 400 ) );
 		}
 		$event_id = sanitize_text_field( wp_unslash( $params['event_id'] ) );
 
 		if ( ! isset( $params['custom_data'] ) ) {
-			return new WP_Error( 'missing_custom_data', __( 'custom_data is required (can be empty object/array).' ), array( 'status' => 400 ) );
+			return new WP_Error( 'missing_custom_data', __( 'custom_data is required (can be empty object/array).', 'wp-pixels-ultra' ), array( 'status' => 400 ) );
 		}
 		$custom_data = self::sanitize_custom_data( $params['custom_data'] );
 
-		// Optional consent enforcement: if provided and false, reject
-		if ( isset( $params['consent'] ) && $params['consent'] !== true && $params['consent'] !== 'true' ) {
-			return new WP_Error( 'consent_required', __( 'Consent required' ), array( 'status' => 403 ) );
+		// Optional consent enforcement: if provided and false, reject.
+		if ( isset( $params['consent'] ) && true !== $params['consent'] && 'true' !== $params['consent'] ) {
+			return new WP_Error( 'consent_required', __( 'Consent required', 'wp-pixels-ultra' ), array( 'status' => 403 ) );
 		}
 
-		// Hash PII in user_data if present; support alias 'user' from GTM tags
+		// Hash PII in user_data if present; support alias 'user' from GTM tags.
 		$user_data = array();
 		if ( isset( $params['user_data'] ) && is_array( $params['user_data'] ) ) {
 			$user_data = $params['user_data'];
@@ -162,7 +164,7 @@ class UP_REST_Ingest {
 			foreach ( $user_data as $k => $v ) {
 				if ( in_array( $k, array( 'email', 'phone', 'phone_number' ), true ) && is_string( $v ) ) {
 					$val = strtolower( trim( wp_unslash( $v ) ) );
-					if ( $k === 'email' ) {
+					if ( 'email' === $k ) {
 						$clean_ud['email_hash'] = hash( 'sha256', $val );
 					} else {
 						$clean_ud['phone_hash'] = hash( 'sha256', preg_replace( '/\D+/', '', $val ) );
@@ -174,12 +176,12 @@ class UP_REST_Ingest {
 			$user_data = $clean_ud;
 		}
 
-		// Enrich server-side
+		// Enrich server-side.
 		$client_ip  = self::get_client_ip( $request );
 		$user_agent = self::get_user_agent( $request );
 		$event_time = time();
 
-		// Normalize source URL
+		// Normalize source URL.
 		$source_url = '';
 		if ( ! empty( $params['source_url'] ) ) {
 			$source_url = esc_url_raw( $params['source_url'] );
@@ -202,7 +204,7 @@ class UP_REST_Ingest {
 			'source_url'        => $source_url,
 		);
 
-		// Use existing queue mechanism
+		// Use existing queue mechanism.
 		if ( class_exists( 'UP_CAPI' ) && method_exists( 'UP_CAPI', 'enqueue_event' ) ) {
 			try {
 				$platform = isset( $params['platform'] ) ? sanitize_text_field( $params['platform'] ) : 'generic';
@@ -211,13 +213,13 @@ class UP_REST_Ingest {
 				if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
 					error_log( '[UP_REST_Ingest] enqueue_event exception: ' . $e->getMessage() );
 				}
-				return new WP_Error( 'enqueue_failed', __( 'Failed to enqueue event.' ), array( 'status' => 500 ) );
+				return new WP_Error( 'enqueue_failed', __( 'Failed to enqueue event.', 'wp-pixels-ultra' ), array( 'status' => 500 ) );
 			}
 		} else {
 			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
 				error_log( '[UP_REST_Ingest] UP_CAPI::enqueue_event not available.' );
 			}
-			return new WP_Error( 'server_misconfigured', __( 'Server queue not available.' ), array( 'status' => 500 ) );
+			return new WP_Error( 'server_misconfigured', __( 'Server queue not available.', 'wp-pixels-ultra' ), array( 'status' => 500 ) );
 		}
 
 		$response_body = array(
@@ -229,6 +231,12 @@ class UP_REST_Ingest {
 		return new WP_REST_Response( $response_body, 202 );
 	}
 
+	/**
+	 * Recursively sanitize custom data values.
+	 *
+	 * @param mixed $data Data to sanitize.
+	 * @return mixed Sanitized data.
+	 */
 	protected static function sanitize_custom_data( $data ) {
 		if ( is_array( $data ) ) {
 			$out = array();
@@ -250,6 +258,12 @@ class UP_REST_Ingest {
 		return sanitize_text_field( wp_json_encode( $data ) );
 	}
 
+	/**
+	 * Get the client IP address from request headers or $_SERVER.
+	 *
+	 * @param WP_REST_Request $request REST request object.
+	 * @return string Client IP address (sanitized).
+	 */
 	protected static function get_client_ip( $request ) {
 		$xff = $request->get_header( 'x-forwarded-for' );
 		if ( $xff ) {
@@ -258,10 +272,18 @@ class UP_REST_Ingest {
 				return trim( sanitize_text_field( $parts[0] ) );
 			}
 		}
-		$remote = $_SERVER['REMOTE_ADDR'] ?? '';
-		return sanitize_text_field( $remote );
+
+		$remote = filter_input( INPUT_SERVER, 'REMOTE_ADDR', FILTER_SANITIZE_STRING );
+		$remote = $remote ? sanitize_text_field( $remote ) : '';
+		return $remote;
 	}
 
+	/**
+	 * Return the client User-Agent string (sanitized).
+	 *
+	 * @param WP_REST_Request $request REST request object.
+	 * @return string User-Agent string.
+	 */
 	protected static function get_user_agent( $request ) {
 		$ua = $request->get_header( 'user-agent' );
 		if ( $ua ) {
