@@ -1,8 +1,21 @@
 <?php
+/**
+ * UP_CAPI
+ *
+ * Server-side event forwarding and queue processing for supported
+ * advertising platforms (Meta, TikTok, Google Ads, Snapchat, Pinterest)
+ * used by the Ultra Pixels plugin.
+ *
+ * @package WP_Pixels_Ultra
+ */
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+/**
+ * CAPI helper methods and queue processing.
+ */
 class UP_CAPI {
 	const QUEUE_OPTION = 'up_capi_queue';
 
@@ -33,9 +46,9 @@ class UP_CAPI {
 		);
 
 		if ( $inserted ) {
-			// Prefer Action Scheduler if available for reliable background processing
+				// Prefer Action Scheduler if available for reliable background processing.
 			if ( function_exists( 'as_schedule_single_action' ) ) {
-				// schedule via Action Scheduler (group: up_capi)
+				// Schedule via Action Scheduler (group: up_capi).
 				as_schedule_single_action( time() + 5, 'up_capi_process_queue', array(), 'up_capi' );
 			} elseif ( ! wp_next_scheduled( 'up_capi_process_queue' ) ) {
 					wp_schedule_single_event( time() + 5, 'up_capi_process_queue' );
@@ -58,13 +71,13 @@ class UP_CAPI {
 		$dl_table = $wpdb->prefix . 'up_capi_deadletter';
 		$now      = time();
 
-		// select eligible rows
+		// Select eligible rows.
 		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} WHERE (next_attempt = 0 OR next_attempt <= %d) ORDER BY created_at ASC LIMIT %d", $now, $limit ), ARRAY_A );
 		if ( empty( $rows ) ) {
 			return 0;
 		}
 		$processed = 0;
-		// Group rows by platform for batch sending
+		// Group rows by platform for batch sending.
 		$groups = array();
 		foreach ( $rows as $row ) {
 			$plat = ! empty( $row['platform'] ) ? $row['platform'] : 'generic';
@@ -74,17 +87,17 @@ class UP_CAPI {
 			$groups[ $plat ][] = $row;
 		}
 
-		foreach ( $groups as $plat => $groupRows ) {
-			// build events array and id map
+		foreach ( $groups as $plat => $group_rows ) {
+			// Build events array and id map.
 			$events = array();
 			$id_map = array();
-			foreach ( $groupRows as $r ) {
+			foreach ( $group_rows as $r ) {
 				$payload  = json_decode( $r['payload'], true );
 				$events[] = is_array( $payload ) ? $payload : array();
 				$id_map[] = $r['id'];
 			}
 
-			// attempt batch send for this platform
+			// Attempt batch send for this platform.
 			$res     = self::send_batch( $plat, $events );
 			$success = true;
 			if ( is_wp_error( $res ) ) {
@@ -99,14 +112,14 @@ class UP_CAPI {
 			}
 
 			if ( $success ) {
-				// delete all successfully sent rows
+				// Delete all successfully sent rows.
 				foreach ( $id_map as $del_id ) {
 					$wpdb->delete( $table, array( 'id' => $del_id ), array( '%d' ) );
 					++$processed;
 				}
 			} else {
-				// handle failures per-row: increment attempts and maybe dead-letter
-				foreach ( $groupRows as $row ) {
+				// Handle failures per-row: increment attempts and maybe dead-letter.
+				foreach ( $group_rows as $row ) {
 					$attempts = intval( $row['attempts'] ) + 1;
 					if ( $attempts >= 5 ) {
 						$wpdb->insert(
@@ -138,12 +151,12 @@ class UP_CAPI {
 				}
 			}
 		}
-		// record last processed time
+		// Record last processed time.
 		update_option( 'up_capi_last_processed', $now );
-		// reschedule if work likely remains
+		// Reschedule if work likely remains.
 		$remaining = $wpdb->get_var( "SELECT COUNT(1) FROM {$table}" );
 		if ( $remaining && intval( $remaining ) > 0 ) {
-			// prefer Action Scheduler if available
+			// Prefer Action Scheduler if available.
 			if ( function_exists( 'as_schedule_single_action' ) ) {
 				as_schedule_single_action( time() + 30, 'up_capi_process_queue', array(), 'up_capi' );
 			} elseif ( ! wp_next_scheduled( 'up_capi_process_queue' ) ) {
@@ -308,7 +321,7 @@ class UP_CAPI {
 	 * @return WP_Error|array|WP_HTTP_Response Response or WP_Error on failure.
 	 */
 	public static function send_event( $platform, $event_name, $payload = array(), $blocking = true ) {
-		// Dispatch to platform-specific adapters when possible
+		// Dispatch to platform-specific adapters when possible.
 		$enable_meta       = UP_Settings::get( 'enable_meta', 'no' ) === 'yes';
 		$meta_id           = UP_Settings::get( 'meta_pixel_id', '' );
 		$enable_tiktok     = UP_Settings::get( 'enable_tiktok', 'no' ) === 'yes';
@@ -324,22 +337,22 @@ class UP_CAPI {
 		$pinterest_token   = UP_Settings::get( 'pinterest_access_token', '' );
 
 		try {
-			if ( $platform === 'meta' || ( $enable_meta && $meta_id && $platform === 'generic' ) ) {
+			if ( 'meta' === $platform || ( $enable_meta && $meta_id && 'generic' === $platform ) ) {
 				return self::send_to_meta( $meta_id, $token, array( array_merge( array( 'event_name' => $event_name ), $payload ) ), $blocking );
 			}
-			if ( $platform === 'tiktok' || ( $enable_tiktok && $tiktok_id && $platform === 'generic' ) ) {
+			if ( 'tiktok' === $platform || ( $enable_tiktok && $tiktok_id && 'generic' === $platform ) ) {
 				return self::send_to_tiktok( $tiktok_id, $token, array( array_merge( array( 'event_name' => $event_name ), $payload ) ), $blocking );
 			}
-			if ( $platform === 'google_ads' || ( $enable_google_ads && $google_ads_id && $platform === 'generic' ) ) {
+			if ( 'google_ads' === $platform || ( $enable_google_ads && $google_ads_id && 'generic' === $platform ) ) {
 				return self::send_to_google_ads( $google_ads_id, $token, array( array_merge( array( 'event_name' => $event_name ), $payload ) ), $blocking );
 			}
-			if ( $platform === 'snapchat' || ( $enable_snapchat && $snapchat_id && $platform === 'generic' ) ) {
+			if ( 'snapchat' === $platform || ( $enable_snapchat && $snapchat_id && 'generic' === $platform ) ) {
 				return self::send_to_snapchat( $snapchat_id, $snapchat_token, array( array_merge( array( 'event_name' => $event_name ), $payload ) ), $blocking );
 			}
-			if ( $platform === 'pinterest' || ( $enable_pinterest && $pinterest_id && $platform === 'generic' ) ) {
+			if ( 'pinterest' === $platform || ( $enable_pinterest && $pinterest_id && 'generic' === $platform ) ) {
 				return self::send_to_pinterest( $pinterest_id, $pinterest_token, array( array_merge( array( 'event_name' => $event_name ), $payload ) ), $blocking );
 			}
-			// Fallback: forward to configured generic CAPI endpoint
+			// Fallback: forward to configured generic CAPI endpoint.
 			$endpoint = UP_Settings::get( 'capi_endpoint', '' );
 			if ( empty( $endpoint ) ) {
 				return new WP_Error( 'no_endpoint', 'CAPI endpoint not configured' );
@@ -386,15 +399,15 @@ class UP_CAPI {
 			return new WP_Error( 'no_events', 'No events to send' );
 		}
 
-		// Check if GTM forwarder is enabled
+		// Check if GTM forwarder is enabled.
 		$use_gtm_forwarder = UP_Settings::get( 'use_gtm_forwarder', 'no' ) === 'yes';
 
 		if ( $use_gtm_forwarder ) {
-			// Route all events through GTM Server Container
+			// Route all events through GTM Server Container.
 			return self::send_to_gtm_server( $platform, $events, true );
 		}
 
-		// Original platform-specific routing
+		// Original platform-specific routing.
 		$token           = UP_Settings::get( 'capi_token', '' );
 		$meta_id         = UP_Settings::get( 'meta_pixel_id', '' );
 		$tiktok_id       = UP_Settings::get( 'tiktok_pixel_id', '' );
@@ -404,22 +417,22 @@ class UP_CAPI {
 		$snapchat_token  = UP_Settings::get( 'snapchat_api_token', '' );
 		$pinterest_token = UP_Settings::get( 'pinterest_access_token', '' );
 
-		if ( $platform === 'meta' && $meta_id ) {
+		if ( 'meta' === $platform && $meta_id ) {
 			return self::send_to_meta( $meta_id, $token, $events, true );
 		}
-		if ( $platform === 'tiktok' && $tiktok_id ) {
+		if ( 'tiktok' === $platform && $tiktok_id ) {
 			return self::send_to_tiktok( $tiktok_id, $token, $events, true );
 		}
-		if ( $platform === 'google_ads' && $google_ads_id ) {
+		if ( 'google_ads' === $platform && $google_ads_id ) {
 			return self::send_to_google_ads( $google_ads_id, $token, $events, true );
 		}
-		if ( $platform === 'snapchat' && $snapchat_id ) {
+		if ( 'snapchat' === $platform && $snapchat_id ) {
 			return self::send_to_snapchat( $snapchat_id, $snapchat_token, $events, true );
 		}
-		if ( $platform === 'pinterest' && $pinterest_id ) {
+		if ( 'pinterest' === $platform && $pinterest_id ) {
 			return self::send_to_pinterest( $pinterest_id, $pinterest_token, $events, true );
 		}
-		// fallback: send each event to generic endpoint individually
+		// Fallback: send each event to generic endpoint individually.
 		$last = null;
 		foreach ( $events as $ev ) {
 			$last = self::send_event( $platform, isset( $ev['event_name'] ) ? $ev['event_name'] : 'event', $ev, true );
@@ -452,7 +465,7 @@ class UP_CAPI {
 				'custom_data'   => isset( $e['custom_data'] ) ? $e['custom_data'] : new stdClass(),
 				'action_source' => isset( $e['action_source'] ) ? $e['action_source'] : 'website',
 			);
-			// Attempt to attach source URL if provided
+			// Attempt to attach source URL if provided.
 			if ( isset( $e['event_source_url'] ) ) {
 				$item['event_source_url'] = esc_url_raw( $e['event_source_url'] );
 			} elseif ( isset( $e['source_url'] ) ) {
@@ -488,7 +501,14 @@ class UP_CAPI {
 	}
 
 	/**
-	 * Send events to TikTok Pixel API (best-effort minimal implementation)
+	 * Send events to TikTok Pixel API (best-effort minimal implementation).
+	 *
+	 * @param string $pixel_id      TikTok pixel identifier.
+	 * @param string $access_token  Access token (optional).
+	 * @param array  $events        Array of event payloads.
+	 * @param bool   $blocking      Whether request should be blocking.
+	 *
+	 * @return array|WP_Error|WP_HTTP_Response
 	 */
 	protected static function send_to_tiktok( $pixel_id, $access_token, $events = array(), $blocking = true ) {
 		// Use TikTok Business API endpoint; structure may need adjustment by integrator
@@ -548,7 +568,18 @@ class UP_CAPI {
 	}
 
 	/**
-	 * Send events to Google Ads Conversion API (Enhanced Conversions)
+	 * Send events to Google Ads Conversion API (Enhanced Conversions).
+	 *
+	 * This implementation prepares a minimal payload intended for
+	 * consumption by a GTM server container or middleware. It does not
+	 * implement OAuth2 flows for direct Google Ads uploads.
+	 *
+	 * @param string $conversion_id Conversion identifier (Google Ads conversion ID).
+	 * @param string $access_token  Optional access token passed to middleware.
+	 * @param array  $events        Array of event payloads.
+	 * @param bool   $blocking      Whether request should be blocking.
+	 *
+	 * @return array|WP_Error|WP_HTTP_Response
 	 */
 	protected static function send_to_google_ads( $conversion_id, $access_token, $events = array(), $blocking = true ) {
 		// Minimal server-side Enhanced Conversions style forwarding.
@@ -610,7 +641,14 @@ class UP_CAPI {
 	}
 
 	/**
-	 * Send events to Snapchat Conversions API
+	 * Send events to Snapchat Conversions API.
+	 *
+	 * @param string $pixel_id      Snapchat pixel ID.
+	 * @param string $access_token  Snapchat access token (optional).
+	 * @param array  $events        Array of event payloads.
+	 * @param bool   $blocking      Whether request should be blocking.
+	 *
+	 * @return array|WP_Error|WP_HTTP_Response
 	 */
 	protected static function send_to_snapchat( $pixel_id, $access_token, $events = array(), $blocking = true ) {
 		$url  = 'https://tr.snapchat.com/v2/conversion';
@@ -668,7 +706,14 @@ class UP_CAPI {
 	}
 
 	/**
-	 * Send events to Pinterest Conversions API
+	 * Send events to Pinterest Conversions API.
+	 *
+	 * @param string $tag_id        Pinterest tag ID.
+	 * @param string $access_token  Pinterest access token (optional).
+	 * @param array  $events        Array of event payloads.
+	 * @param bool   $blocking      Whether request should be blocking.
+	 *
+	 * @return array|WP_Error|WP_HTTP_Response
 	 */
 	protected static function send_to_pinterest( $tag_id, $access_token, $events = array(), $blocking = true ) {
 		// Pinterest Conversions API (events endpoint)
@@ -719,12 +764,16 @@ class UP_CAPI {
 	}
 
 	/**
-	 * Send events to GTM Server Container for unified routing
+	 * Send events to a GTM Server Container for unified routing.
 	 *
-	 * @param string $platform Platform identifier (meta, tiktok, google_ads, etc.)
-	 * @param array  $events Array of event payloads
-	 * @param bool   $blocking Whether to wait for response
-	 * @return array|WP_Error Response from GTM server
+	 * Prepares a small batch payload including platform identifiers and
+	 * events and forwards it to the configured GTM Server URL.
+	 *
+	 * @param string $platform Platform identifier (meta, tiktok, google_ads, etc.).
+	 * @param array  $events   Array of event payloads.
+	 * @param bool   $blocking Whether to wait for response.
+	 *
+	 * @return array|WP_Error|WP_HTTP_Response Response from GTM server or WP_Error on failure.
 	 */
 	protected static function send_to_gtm_server( $platform, $events = array(), $blocking = true ) {
 		$gtm_server_url = UP_Settings::get( 'gtm_server_url', '' );
@@ -791,13 +840,21 @@ class UP_CAPI {
 		return $response;
 	}
 
+	/**
+	 * Append a message to the plugin CAPI log and PHP error log.
+	 *
+	 * @param string $level   Log level (e.g. 'info', 'warn', 'error').
+	 * @param string $message Log message.
+	 *
+	 * @return void
+	 */
 	protected static function log( $level, $message ) {
 		$log = get_option( 'up_capi_log', array() );
 		if ( ! is_array( $log ) ) {
 			$log = array();
 		}
 		$log[] = array(
-			'time'  => date( 'c' ),
+			'time'  => gmdate( 'c' ),
 			'level' => $level,
 			'msg'   => $message,
 		);
@@ -805,6 +862,8 @@ class UP_CAPI {
 			$log = array_slice( $log, -100 );
 		}
 		update_option( 'up_capi_log', $log );
-		error_log( '[UP_CAPI] ' . $message );
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( '[UP_CAPI] ' . $message );
+		}
 	}
 }
