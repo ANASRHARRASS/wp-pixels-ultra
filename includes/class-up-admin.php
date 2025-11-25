@@ -1,8 +1,21 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) {
-	exit; }
+	exit;
+}
 
+/**
+ * UP_Admin
+ *
+ * Admin UI helpers: menu, settings registration, and asset enqueuing.
+ *
+ * @package WP_Pixels_Ultra
+ */
 class UP_Admin {
+	/**
+	 * Register admin menu entry.
+	 *
+	 * @return void
+	 */
 	public static function register_menu() {
 		add_menu_page(
 			__( 'Ultra Pixels', 'ultra-pixels-ultra' ),
@@ -15,20 +28,31 @@ class UP_Admin {
 		);
 	}
 
+	/**
+	 * Initialize settings (register with WP Settings API).
+	 *
+	 * @return void
+	 */
 	public static function register_settings() {
 		if ( class_exists( 'UP_Settings' ) ) {
 			UP_Settings::init();
 		}
 	}
 
+	/**
+	 * Enqueue admin assets and localize admin endpoints.
+	 *
+	 * @param string $hook Current admin page hook.
+	 * @return void
+	 */
 	public static function enqueue_assets( $hook ) {
-		// Only load assets on our settings page
-		if ( strpos( $hook, 'up-settings' ) === false && $hook !== 'toplevel_page_up-settings' ) {
+		// Only load assets on our settings page.
+		if ( false === strpos( $hook, 'up-settings' ) && 'toplevel_page_up-settings' !== $hook ) {
 			return;
 		}
 		wp_enqueue_style( 'up-admin', UP_PLUGIN_URL . 'assets/admin.css', array(), UP_VERSION );
 		wp_enqueue_script( 'up-admin', UP_PLUGIN_URL . 'assets/admin.js', array( 'jquery' ), UP_VERSION, true );
-		// Localize admin endpoints + nonce for admin interactions
+		// Localize admin endpoints + nonce for admin interactions.
 		wp_localize_script(
 			'up-admin',
 			'UPAdmin',

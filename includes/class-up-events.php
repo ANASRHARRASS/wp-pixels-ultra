@@ -1,8 +1,21 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) {
-	exit; }
+	exit;
+}
 
+/**
+ * UP_Events
+ *
+ * Handles client data layer pushes and server-side event routing for e-commerce events.
+ *
+ * @package WP_Pixels_Ultra
+ */
 class UP_Events {
+	/**
+	 * Initialize event hooks.
+	 *
+	 * @return void
+	 */
 	public static function init() {
 		if ( function_exists( 'is_woocommerce' ) ) {
 			add_action( 'woocommerce_thankyou', array( __CLASS__, 'on_purchase' ), 10, 1 );
@@ -84,10 +97,10 @@ class UP_Events {
 		$supported_platforms = array( 'meta', 'tiktok', 'google_ads', 'snapchat', 'pinterest' );
 
 		if ( ! isset( $map[ $event_key ] ) ) {
-			// Default: send to enabled platforms with generic event name
+			// Default: send to enabled platforms with generic event name.
 			foreach ( $supported_platforms as $platform ) {
 				$enable_key = 'enable_' . $platform;
-				if ( UP_Settings::get( $enable_key, 'no' ) === 'yes' ) {
+				if ( 'yes' === UP_Settings::get( $enable_key, 'no' ) ) {
 					UP_CAPI::enqueue_event( $platform, ucfirst( $event_key ), $payload );
 				}
 			}
@@ -99,9 +112,9 @@ class UP_Events {
 			if ( in_array( $platform, $supported_platforms, true ) ) {
 				$event_name = isset( $cfg['event_name'] ) ? $cfg['event_name'] : ( isset( $cfg['event'] ) ? $cfg['event'] : ucfirst( $event_key ) );
 
-				// Check if platform is enabled
+				// Check if platform is enabled.
 				$enable_key = 'enable_' . $platform;
-				if ( UP_Settings::get( $enable_key, 'no' ) === 'yes' ) {
+				if ( 'yes' === UP_Settings::get( $enable_key, 'no' ) ) {
 					if ( method_exists( 'UP_CAPI', 'enqueue_event' ) ) {
 						UP_CAPI::enqueue_event( $platform, $event_name, $payload );
 					} else {
