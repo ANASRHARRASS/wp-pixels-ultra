@@ -8,12 +8,25 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+/**
+ * REST ingest handler.
+ */
 class UP_REST_Ingest {
 
+	/**
+	 * Initialize hooks.
+	 *
+	 * @return void
+	 */
 	public static function init() {
 		add_action( 'rest_api_init', array( __CLASS__, 'register_routes' ) );
 	}
 
+	/**
+	 * Register REST routes.
+	 *
+	 * @return void
+	 */
 	public static function register_routes() {
 		register_rest_route(
 			'up/v1',
@@ -26,6 +39,12 @@ class UP_REST_Ingest {
 		);
 	}
 
+	/**
+	 * Permission callback for ingest route.
+	 *
+	 * @param WP_REST_Request $request REST request.
+	 * @return bool|WP_Error
+	 */
 	public static function permission_callback( $request ) {
 		// 1) Allow server secret if provided
 		$incoming_secret = $request->get_header( 'x-up-secret' );
@@ -41,12 +60,12 @@ class UP_REST_Ingest {
 		}
 
 		// 3) Same-origin anonymous fallback with rate limiting — check Origin/Referer host match
-		$site_host = parse_url( home_url(), PHP_URL_HOST );
+		$site_host = wp_parse_url( home_url(), PHP_URL_HOST );
 		$origin    = $request->get_header( 'origin' );
 		$referer   = $request->get_header( 'referer' );
 		$hdr       = $origin ? $origin : $referer;
-		if ( $hdr ) {
-			$hdr_host = parse_url( $hdr, PHP_URL_HOST );
+		if ( ! empty( $hdr ) ) {
+			$hdr_host = wp_parse_url( $hdr, PHP_URL_HOST );
 			if ( $hdr_host && $site_host && strcasecmp( $hdr_host, $site_host ) === 0 ) {
 				return true;
 			}
@@ -55,6 +74,12 @@ class UP_REST_Ingest {
 		return new WP_Error( 'rest_forbidden', __( 'Unauthorized ingest request.' ), array( 'status' => 401 ) );
 	}
 
+	/**
+	 * Ingest an event from browser/GTM.
+	 *
+	 * @param WP_REST_Request $request REST request.
+	 * @return WP_REST_Response|WP_Error
+	 */
 	public static function ingest_event_callback( WP_REST_Request $request ) {
 		$params = $request->get_json_params();
 		if ( empty( $params ) || ! is_array( $params ) ) {
@@ -183,11 +208,15 @@ class UP_REST_Ingest {
 				$platform = isset( $params['platform'] ) ? sanitize_text_field( $params['platform'] ) : 'generic';
 				UP_CAPI::enqueue_event( $platform, $event, $validated_payload );
 			} catch ( Throwable $e ) {
-				error_log( '[UP_REST_Ingest] enqueue_event exception: ' . $e->getMessage() );
+				if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+					error_log( '[UP_REST_Ingest] enqueue_event exception: ' . $e->getMessage() );
+				}
 				return new WP_Error( 'enqueue_failed', __( 'Failed to enqueue event.' ), array( 'status' => 500 ) );
 			}
 		} else {
-			error_log( '[UP_REST_Ingest] UP_CAPI::enqueue_event not available.' );
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( '[UP_REST_Ingest] UP_CAPI::enqueue_event not available.' );
+			}
 			return new WP_Error( 'server_misconfigured', __( 'Server queue not available.' ), array( 'status' => 500 ) );
 		}
 
