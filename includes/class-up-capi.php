@@ -1,12 +1,20 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) {
-    exit;
+	exit;
 }
 
 class UP_CAPI {
 	const QUEUE_OPTION = 'up_capi_queue';
 
-	// enqueue payload into DB-backed queue for async processing
+	/**
+	 * Enqueue payload into DB-backed queue for async processing.
+	 *
+	 * @param string $platform    Platform name (e.g., 'meta', 'tiktok').
+	 * @param string $event_name  Event name.
+	 * @param array  $payload     Event payload.
+	 *
+	 * @return bool True on success, false on failure.
+	 */
 	public static function enqueue_event( $platform, $event_name, $payload = array() ) {
 		global $wpdb;
 		$table    = $wpdb->prefix . 'up_capi_queue';
@@ -37,7 +45,13 @@ class UP_CAPI {
 		return false;
 	}
 
-	// process up to $limit events from the queue
+	/**
+	 * Process up to $limit events from the queue.
+	 *
+	 * @param int $limit Max number of events to process.
+	 *
+	 * @return int Number of processed items.
+	 */
 	public static function process_queue( $limit = 10 ) {
 		global $wpdb;
 		$table    = $wpdb->prefix . 'up_capi_queue';
@@ -139,7 +153,11 @@ class UP_CAPI {
 		return $processed;
 	}
 
-	// helper: return current queue length (DB-backed)
+	/**
+	 * Get current queue length.
+	 *
+	 * @return int Queue length.
+	 */
 	public static function get_queue_length() {
 		global $wpdb;
 		$table = $wpdb->prefix . 'up_capi_queue';
@@ -147,7 +165,14 @@ class UP_CAPI {
 		return intval( $cnt );
 	}
 
-	// list queued items (admin) with simple pagination
+	/**
+	 * List queued items (admin) with simple pagination.
+	 *
+	 * @param int $limit  Items per page.
+	 * @param int $offset Offset.
+	 *
+	 * @return array List of queue rows.
+	 */
 	public static function list_queue( $limit = 20, $offset = 0 ) {
 		global $wpdb;
 		$table = $wpdb->prefix . 'up_capi_queue';
@@ -158,7 +183,13 @@ class UP_CAPI {
 		return $rows;
 	}
 
-	// retry a queued item (reset attempts/next_attempt)
+	/**
+	 * Retry a queued item (reset attempts/next_attempt).
+	 *
+	 * @param int $id Queue row ID.
+	 *
+	 * @return bool True on success.
+	 */
 	public static function retry_item( $id ) {
 		global $wpdb;
 		$table = $wpdb->prefix . 'up_capi_queue';
@@ -174,14 +205,27 @@ class UP_CAPI {
 		);
 	}
 
-	// delete queued item
+	/**
+	 * Delete queued item.
+	 *
+	 * @param int $id Queue row ID.
+	 *
+	 * @return bool True on success.
+	 */
 	public static function delete_item( $id ) {
 		global $wpdb;
 		$table = $wpdb->prefix . 'up_capi_queue';
 		return (bool) $wpdb->delete( $table, array( 'id' => intval( $id ) ), array( '%d' ) );
 	}
 
-	// list dead-letter items
+	/**
+	 * List dead-letter items.
+	 *
+	 * @param int $limit  Items per page.
+	 * @param int $offset Offset.
+	 *
+	 * @return array Dead-letter rows.
+	 */
 	public static function list_deadletter( $limit = 20, $offset = 0 ) {
 		global $wpdb;
 		$table = $wpdb->prefix . 'up_capi_deadletter';
@@ -192,7 +236,13 @@ class UP_CAPI {
 		return $rows;
 	}
 
-	// retry dead-letter item: move back to queue
+	/**
+	 * Retry a dead-letter item by reinserting to queue.
+	 *
+	 * @param int $id Dead-letter row ID.
+	 *
+	 * @return bool True on success.
+	 */
 	public static function retry_deadletter( $id ) {
 		global $wpdb;
 		$dl_table = $wpdb->prefix . 'up_capi_deadletter';
@@ -221,14 +271,24 @@ class UP_CAPI {
 		return false;
 	}
 
-	// delete dead-letter item permanently
+	/**
+	 * Delete dead-letter item permanently.
+	 *
+	 * @param int $id Dead-letter row ID.
+	 *
+	 * @return bool True on success.
+	 */
 	public static function delete_deadletter( $id ) {
 		global $wpdb;
 		$dl_table = $wpdb->prefix . 'up_capi_deadletter';
 		return (bool) $wpdb->delete( $dl_table, array( 'id' => intval( $id ) ), array( '%d' ) );
 	}
 
-	// return recent logs stored in option
+	/**
+	 * Return recent logs stored in option.
+	 *
+	 * @return array Recent logs.
+	 */
 	public static function get_logs() {
 		$log = get_option( 'up_capi_log', array() );
 		if ( ! is_array( $log ) ) {
@@ -237,6 +297,16 @@ class UP_CAPI {
 		return array_slice( array_reverse( $log ), 0, 100 );
 	}
 
+	/**
+	 * Send a single event to the specified platform or generic endpoint.
+	 *
+	 * @param string $platform   Platform identifier or 'generic'.
+	 * @param string $event_name Event name.
+	 * @param array  $payload    Event payload.
+	 * @param bool   $blocking   Whether the request should be blocking.
+	 *
+	 * @return WP_Error|array|WP_HTTP_Response Response or WP_Error on failure.
+	 */
 	public static function send_event( $platform, $event_name, $payload = array(), $blocking = true ) {
 		// Dispatch to platform-specific adapters when possible
 		$enable_meta       = UP_Settings::get( 'enable_meta', 'no' ) === 'yes';
@@ -303,6 +373,14 @@ class UP_CAPI {
 	/**
 	 * Batch sender: platform => events array
 	 */
+	/**
+	 * Batch sender: platform => events array.
+	 *
+	 * @param string $platform Platform identifier.
+	 * @param array  $events   Array of events.
+	 *
+	 * @return WP_Error|array|WP_HTTP_Response
+	 */
 	protected static function send_batch( $platform, $events = array() ) {
 		if ( empty( $events ) ) {
 			return new WP_Error( 'no_events', 'No events to send' );
@@ -351,6 +429,16 @@ class UP_CAPI {
 
 	/**
 	 * Send events to Meta Pixel via Graph API (batch)
+	 */
+	/**
+	 * Send events to Meta Pixel via Graph API (batch).
+	 *
+	 * @param string $pixel_id     Meta Pixel ID.
+	 * @param string $access_token Access token.
+	 * @param array  $events       Events array.
+	 * @param bool   $blocking     Whether request should be blocking.
+	 *
+	 * @return WP_Error|array|WP_HTTP_Response
 	 */
 	protected static function send_to_meta( $pixel_id, $access_token, $events = array(), $blocking = true ) {
 		$url  = 'https://graph.facebook.com/v17.0/' . rawurlencode( $pixel_id ) . '/events?access_token=' . rawurlencode( $access_token );
