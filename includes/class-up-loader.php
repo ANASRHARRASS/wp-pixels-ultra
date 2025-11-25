@@ -1,8 +1,21 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) {
-	exit; }
+	exit;
+}
 
+/**
+ * UP_Loader
+ *
+ * Loads plugin components conditionally and registers core hooks.
+ *
+ * @package WP_Pixels_Ultra
+ */
 class UP_Loader {
+	/**
+	 * Initialize loader: require includes and attach hooks.
+	 *
+	 * @return void
+	 */
 	public static function init() {
 		$inc_dir = UP_PLUGIN_DIR . 'includes/';
 
@@ -69,7 +82,7 @@ class UP_Loader {
 						'google_ads_id'     => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'google_ads_id', '' ) : '',
 						'snapchat_pixel_id' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'snapchat_pixel_id', '' ) : '',
 						'pinterest_tag_id'  => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'pinterest_tag_id', '' ) : '',
-						'gtm_manage_pixels' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'gtm_manage_pixels', 'no' ) === 'yes' : false,
+						'gtm_manage_pixels' => class_exists( 'UP_Settings' ) ? 'yes' === UP_Settings::get( 'gtm_manage_pixels', 'no' ) : false,
 						'tracking_mode'     => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'tracking_mode', 'hybrid' ) : 'hybrid',
 					)
 				);
@@ -93,7 +106,7 @@ class UP_Loader {
 							'google_ads_id'     => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'google_ads_id', '' ) : '',
 							'snapchat_pixel_id' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'snapchat_pixel_id', '' ) : '',
 							'pinterest_tag_id'  => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'pinterest_tag_id', '' ) : '',
-							'gtm_manage_pixels' => class_exists( 'UP_Settings' ) ? UP_Settings::get( 'gtm_manage_pixels', 'no' ) === 'yes' : false,
+							'gtm_manage_pixels' => class_exists( 'UP_Settings' ) ? 'yes' === UP_Settings::get( 'gtm_manage_pixels', 'no' ) : false,
 						)
 					);
 				}

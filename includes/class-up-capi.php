@@ -72,7 +72,7 @@ class UP_CAPI {
 		$now      = time();
 
 		// Select eligible rows.
-		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} WHERE (next_attempt = 0 OR next_attempt <= %d) ORDER BY created_at ASC LIMIT %d", $now, $limit ), ARRAY_A );
+		$rows = $wpdb->get_results( $wpdb->prepare( sprintf( 'SELECT * FROM %s WHERE (next_attempt = 0 OR next_attempt <= %%d) ORDER BY created_at ASC LIMIT %%d', esc_sql( $table ) ), $now, $limit ), ARRAY_A );
 		if ( empty( $rows ) ) {
 			return 0;
 		}
@@ -154,7 +154,7 @@ class UP_CAPI {
 		// Record last processed time.
 		update_option( 'up_capi_last_processed', $now );
 		// Reschedule if work likely remains.
-		$remaining = $wpdb->get_var( "SELECT COUNT(1) FROM {$table}" );
+		$remaining = $wpdb->get_var( 'SELECT COUNT(1) FROM ' . esc_sql( $table ) );
 		if ( $remaining && intval( $remaining ) > 0 ) {
 			// Prefer Action Scheduler if available.
 			if ( function_exists( 'as_schedule_single_action' ) ) {
@@ -174,7 +174,7 @@ class UP_CAPI {
 	public static function get_queue_length() {
 		global $wpdb;
 		$table = $wpdb->prefix . 'up_capi_queue';
-		$cnt   = $wpdb->get_var( "SELECT COUNT(1) FROM {$table}" );
+		$cnt   = $wpdb->get_var( 'SELECT COUNT(1) FROM ' . esc_sql( $table ) );
 		return intval( $cnt );
 	}
 
@@ -189,7 +189,7 @@ class UP_CAPI {
 	public static function list_queue( $limit = 20, $offset = 0 ) {
 		global $wpdb;
 		$table = $wpdb->prefix . 'up_capi_queue';
-		$rows  = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} ORDER BY created_at DESC LIMIT %d OFFSET %d", intval( $limit ), intval( $offset ) ), ARRAY_A );
+		$rows  = $wpdb->get_results( $wpdb->prepare( sprintf( 'SELECT * FROM %s ORDER BY created_at DESC LIMIT %%d OFFSET %%d', esc_sql( $table ) ), intval( $limit ), intval( $offset ) ), ARRAY_A );
 		foreach ( $rows as &$r ) {
 			$r['payload'] = json_decode( $r['payload'], true );
 		}
@@ -242,7 +242,7 @@ class UP_CAPI {
 	public static function list_deadletter( $limit = 20, $offset = 0 ) {
 		global $wpdb;
 		$table = $wpdb->prefix . 'up_capi_deadletter';
-		$rows  = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} ORDER BY failed_at DESC LIMIT %d OFFSET %d", intval( $limit ), intval( $offset ) ), ARRAY_A );
+		$rows  = $wpdb->get_results( $wpdb->prepare( sprintf( 'SELECT * FROM %s ORDER BY failed_at DESC LIMIT %%d OFFSET %%d', esc_sql( $table ) ), intval( $limit ), intval( $offset ) ), ARRAY_A );
 		foreach ( $rows as &$r ) {
 			$r['payload'] = json_decode( $r['payload'], true );
 		}
@@ -260,7 +260,7 @@ class UP_CAPI {
 		global $wpdb;
 		$dl_table = $wpdb->prefix . 'up_capi_deadletter';
 		$table    = $wpdb->prefix . 'up_capi_queue';
-		$row      = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$dl_table} WHERE id = %d", intval( $id ) ), ARRAY_A );
+		$row      = $wpdb->get_row( $wpdb->prepare( sprintf( 'SELECT * FROM %s WHERE id = %%d', esc_sql( $dl_table ) ), intval( $id ) ), ARRAY_A );
 		if ( ! $row ) {
 			return false;
 		}
@@ -322,15 +322,15 @@ class UP_CAPI {
 	 */
 	public static function send_event( $platform, $event_name, $payload = array(), $blocking = true ) {
 		// Dispatch to platform-specific adapters when possible.
-		$enable_meta       = UP_Settings::get( 'enable_meta', 'no' ) === 'yes';
+		$enable_meta       = 'yes' === UP_Settings::get( 'enable_meta', 'no' );
 		$meta_id           = UP_Settings::get( 'meta_pixel_id', '' );
-		$enable_tiktok     = UP_Settings::get( 'enable_tiktok', 'no' ) === 'yes';
+		$enable_tiktok     = 'yes' === UP_Settings::get( 'enable_tiktok', 'no' );
 		$tiktok_id         = UP_Settings::get( 'tiktok_pixel_id', '' );
-		$enable_google_ads = UP_Settings::get( 'enable_google_ads', 'no' ) === 'yes';
+		$enable_google_ads = 'yes' === UP_Settings::get( 'enable_google_ads', 'no' );
 		$google_ads_id     = UP_Settings::get( 'google_ads_id', '' );
-		$enable_snapchat   = UP_Settings::get( 'enable_snapchat', 'no' ) === 'yes';
+		$enable_snapchat   = 'yes' === UP_Settings::get( 'enable_snapchat', 'no' );
 		$snapchat_id       = UP_Settings::get( 'snapchat_pixel_id', '' );
-		$enable_pinterest  = UP_Settings::get( 'enable_pinterest', 'no' ) === 'yes';
+		$enable_pinterest  = 'yes' === UP_Settings::get( 'enable_pinterest', 'no' );
 		$pinterest_id      = UP_Settings::get( 'pinterest_tag_id', '' );
 		$token             = UP_Settings::get( 'capi_token', '' );
 		$snapchat_token    = UP_Settings::get( 'snapchat_api_token', '' );
@@ -400,7 +400,7 @@ class UP_CAPI {
 		}
 
 		// Check if GTM forwarder is enabled.
-		$use_gtm_forwarder = UP_Settings::get( 'use_gtm_forwarder', 'no' ) === 'yes';
+		$use_gtm_forwarder = 'yes' === UP_Settings::get( 'use_gtm_forwarder', 'no' );
 
 		if ( $use_gtm_forwarder ) {
 			// Route all events through GTM Server Container.
@@ -525,7 +525,7 @@ class UP_CAPI {
 				'properties' => is_array( $e['custom_data'] ) ? $e['custom_data'] : ( is_object( $e['custom_data'] ) ? (array) $e['custom_data'] : array() ),
 				'user'       => array(),
 			);
-			// Attach source URL into properties if available
+			// Attach source URL into properties if available.
 			if ( isset( $e['source_url'] ) && empty( $item['properties']['url'] ) ) {
 				$item['properties']['url'] = esc_url_raw( $e['source_url'] );
 			}
@@ -557,7 +557,7 @@ class UP_CAPI {
 		if ( is_wp_error( $response ) ) {
 			self::log( 'error', 'TikTok send error: ' . $response->get_error_message() );
 		}
-		// Log non-2xx responses for visibility
+		// Log non-2xx responses for visibility.
 		if ( is_array( $response ) && isset( $response['response']['code'] ) ) {
 			$code = intval( $response['response']['code'] );
 			if ( $code < 200 || $code >= 300 ) {
@@ -592,7 +592,7 @@ class UP_CAPI {
 			self::log( 'warn', 'Google Ads send skipped: gtm_server_url not configured' );
 			return new WP_Error( 'google_ads_not_configured', 'GTM server URL required for Google Ads forwarding.' );
 		}
-		$endpoint = trailingslashit( $server_container ) . 'up-google-ads'; // custom path expected by integrator
+		$endpoint = trailingslashit( $server_container ) . 'up-google-ads'; // custom path expected by integrator.
 		$payloads = array();
 		foreach ( $events as $e ) {
 			$ec = array(
@@ -626,7 +626,7 @@ class UP_CAPI {
 			'blocking' => (bool) $blocking,
 		);
 		if ( ! empty( $access_token ) ) {
-			$args['headers']['Authorization'] = 'Bearer ' . $access_token; // optional generic token if middleware wants it
+			$args['headers']['Authorization'] = 'Bearer ' . $access_token; // optional generic token if middleware wants it.
 		}
 		$response = wp_remote_post( $endpoint, $args );
 		if ( is_wp_error( $response ) ) {
@@ -652,7 +652,7 @@ class UP_CAPI {
 	 */
 	protected static function send_to_snapchat( $pixel_id, $access_token, $events = array(), $blocking = true ) {
 		$url  = 'https://tr.snapchat.com/v2/conversion';
-		$body = array( 'batch' => array() ); // batch key supports multiple events
+		$body = array( 'batch' => array() ); // batch key supports multiple events.
 		foreach ( $events as $e ) {
 			$item = array(
 				'pixel_id'      => $pixel_id,
@@ -664,7 +664,7 @@ class UP_CAPI {
 			if ( isset( $e['source_url'] ) ) {
 				$item['event_source_url'] = esc_url_raw( $e['source_url'] );
 			}
-			// User data (hashed)
+			// User data (hashed).
 			if ( isset( $e['user_data'] ) && is_array( $e['user_data'] ) ) {
 				$item['user'] = array();
 				if ( isset( $e['user_data']['email_hash'] ) ) {
@@ -674,7 +674,7 @@ class UP_CAPI {
 					$item['user']['ph'] = $e['user_data']['phone_hash'];
 				}
 			}
-			// Custom data
+			// Custom data.
 			if ( isset( $e['custom_data'] ) && is_array( $e['custom_data'] ) ) {
 				if ( isset( $e['custom_data']['value'] ) ) {
 					$item['price'] = floatval( $e['custom_data']['value'] );
@@ -716,7 +716,7 @@ class UP_CAPI {
 	 * @return array|WP_Error|WP_HTTP_Response
 	 */
 	protected static function send_to_pinterest( $tag_id, $access_token, $events = array(), $blocking = true ) {
-		// Pinterest Conversions API (events endpoint)
+		// Pinterest Conversions API (events endpoint).
 		$url  = 'https://api.pinterest.com/v5/events';
 		$body = array( 'data' => array() );
 		foreach ( $events as $e ) {
@@ -783,10 +783,10 @@ class UP_CAPI {
 			return new WP_Error( 'gtm_not_configured', 'GTM Server Container URL is required for GTM forwarding.' );
 		}
 
-		// Build the endpoint URL - use a standard path for event ingestion
+		// Build the endpoint URL - use a standard path for event ingestion.
 		$endpoint = trailingslashit( $gtm_server_url ) . 'event';
 
-		// Get platform-specific IDs for forwarding to GTM
+		// Get platform-specific IDs for forwarding to GTM.
 		$pixel_ids = array(
 			'meta_pixel_id'     => UP_Settings::get( 'meta_pixel_id', '' ),
 			'tiktok_pixel_id'   => UP_Settings::get( 'tiktok_pixel_id', '' ),
@@ -796,7 +796,7 @@ class UP_CAPI {
 			'pinterest_tag_id'  => UP_Settings::get( 'pinterest_tag_id', '' ),
 		);
 
-		// Prepare batch payload for GTM server
+		// Prepare batch payload for GTM server.
 		$payload = array(
 			'platform'  => $platform,
 			'events'    => $events,
@@ -811,7 +811,7 @@ class UP_CAPI {
 		// $capi_token = UP_Settings::get( 'capi_token', '' );
 		// $snapchat_token = UP_Settings::get( 'snapchat_api_token', '' );
 		// $pinterest_token = UP_Settings::get( 'pinterest_access_token', '' );
-		// (Tokens intentionally not sent to GTM server for security reasons.)
+		// Tokens intentionally not sent to GTM server for security reasons.
 
 		$args = array(
 			'timeout'  => 20,
