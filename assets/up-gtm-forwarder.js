@@ -1,24 +1,18 @@
 (function (window) {
   'use strict';
 
-  var cfg = window.UP_CONFIG || {};
-  var ingestUrl = cfg.ingest_url || (window.location.origin + '/wp-json/up/v1/ingest');
-  var wpNonce = cfg.wp_nonce || (window.wpApiSettings && window.wpApiSettings.nonce) || null;
+  const cfg = window.UP_CONFIG || {};
+  const ingestUrl = cfg.ingest_url || (window.location.origin + '/wp-json/up/v1/ingest');
+  const wpNonce = cfg.wp_nonce || (window.wpApiSettings && window.wpApiSettings.nonce) || null;
 
   function sendToIngest(payload) {
     try {
-      var body = JSON.stringify(payload);
-      var headers = { 'Content-Type': 'application/json' };
+      const body = JSON.stringify(payload);
+      const headers = { 'Content-Type': 'application/json' };
       if (wpNonce) headers['X-WP-Nonce'] = wpNonce;
 
-      // Prefer sendBeacon for navigation reliability; server accepts same-origin without nonce
-      if (navigator && navigator.sendBeacon) {
-        try {
-          var blob = new Blob([body], { type: 'application/json' });
-          navigator.sendBeacon(ingestUrl, blob);
-          return;
-        } catch (e) { /* fallback to fetch */ }
-      }
+      // Always use fetch with keepalive for reliability and to ensure X-WP-Nonce is sent.
+      // navigator.sendBeacon does not support custom headers, so cannot be used for authenticated requests.
 
       fetch(ingestUrl, {
         method: 'POST',
@@ -40,18 +34,25 @@
     window.UP_GTM_FORWARD = function (evt) {
       try {
         if (!evt || typeof evt !== 'object') return;
+
+        // Create a deep copy to avoid mutating caller's data
+        const normalizedEvt = JSON.parse(JSON.stringify(evt));
+
         // Normalize GTM alias: support evt.user but prefer evt.user_data
-        if (evt.user && !evt.user_data) {
-          evt.user_data = evt.user;
+        // Use the deep-copied object consistently (check normalizedEvt, not evt)
+        if (normalizedEvt.user && !normalizedEvt.user_data) {
+          normalizedEvt.user_data = normalizedEvt.user;
         }
-        // Remove raw PII coming from GTM; server will handle hashing
-        if (evt.user_data) {
-          if (evt.user_data.email) delete evt.user_data.email;
-          if (evt.user_data.phone) delete evt.user_data.phone;
-          if (evt.user_data.phone_number) delete evt.user_data.phone_number;
+
+        // Remove raw PII for privacy; these fields are not sent to the server
+        if (normalizedEvt.user_data && typeof normalizedEvt.user_data === 'object') {
+          delete normalizedEvt.user_data.email;
+          delete normalizedEvt.user_data.phone;
+          delete normalizedEvt.user_data.phone_number;
         }
-        if (!evt.event) evt.event = evt.event_name || 'custom_event';
-        sendToIngest(evt);
+
+        if (!normalizedEvt.event) normalizedEvt.event = normalizedEvt.event_name || 'custom_event';
+        sendToIngest(normalizedEvt);
       } catch (e) {
         if (window.console) console.error('UP_GTM_FORWARD exception', e);
       }

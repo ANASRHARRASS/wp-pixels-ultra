@@ -1,25 +1,26 @@
 <?php
-if ( ! defined( 'ABSPATH' ) ) { exit; }
+if ( ! defined( 'ABSPATH' ) ) {
+	exit; }
 
 /**
  * Elementor integration helpers for Ultra Pixels plugin
  * Provides automatic tracking for Elementor widgets, popups, and forms
  */
 class UP_Elementor {
-	
+
 	public static function init() {
 		// Only initialize if Elementor is active
 		if ( ! did_action( 'elementor/loaded' ) ) {
 			return;
 		}
-		
+
 		// Add tracking scripts for Elementor pages
 		add_action( 'wp_footer', array( __CLASS__, 'output_tracking_script' ), 999 );
-		
+
 		// Hook into Elementor form submissions
 		add_action( 'elementor_pro/forms/new_record', array( __CLASS__, 'on_form_submit' ), 10, 2 );
 	}
-	
+
 	/**
 	 * Output JavaScript for tracking Elementor interactions
 	 */
@@ -28,7 +29,7 @@ class UP_Elementor {
 		if ( ! \Elementor\Plugin::$instance->documents->get_current() ) {
 			return;
 		}
-		
+
 		?>
 <script>
 (function() {
@@ -183,25 +184,25 @@ class UP_Elementor {
 </script>
 		<?php
 	}
-	
+
 	/**
 	 * Track Elementor Pro form submissions
-	 * 
-	 * @param \ElementorPro\Modules\Forms\Classes\Form_Record $record
+	 *
+	 * @param \ElementorPro\Modules\Forms\Classes\Form_Record  $record
 	 * @param \ElementorPro\Modules\Forms\Classes\Ajax_Handler $ajax_handler
 	 */
 	public static function on_form_submit( $record, $ajax_handler ) {
 		$form_name = $record->get_form_settings( 'form_name' );
-		$form_id = $record->get_form_settings( 'id' );
-		$fields = $record->get( 'fields' );
-		
+		$form_id   = $record->get_form_settings( 'id' );
+		$fields    = $record->get( 'fields' );
+
 		// Build form data (don't include sensitive fields)
 		$form_data = array(
-			'form_name' => $form_name,
-			'form_id' => $form_id,
+			'form_name'   => $form_name,
+			'form_id'     => $form_id,
 			'field_count' => count( $fields ),
 		);
-		
+
 		// Check if email field exists (for user data)
 		$email = '';
 		foreach ( $fields as $field_id => $field ) {
@@ -210,10 +211,12 @@ class UP_Elementor {
 				break;
 			}
 		}
-		
+
 		// Push to dataLayer via inline script
-		add_action( 'wp_footer', function() use ( $form_name, $form_id, $email ) {
-			?>
+		add_action(
+			'wp_footer',
+			function () use ( $form_name, $form_id, $email ) {
+				?>
 <script>
 if (window.dataLayer) {
 	window.dataLayer.push({
@@ -223,7 +226,7 @@ if (window.dataLayer) {
 		event_time: <?php echo time(); ?>,
 		source_url: window.location.href,
 		user_data: {
-			<?php if ( $email ) : ?>
+				<?php if ( $email ) : ?>
 			email_hash: '<?php echo hash( 'sha256', strtolower( trim( $email ) ) ); ?>'
 			<?php endif; ?>
 		},
@@ -235,20 +238,22 @@ if (window.dataLayer) {
 	});
 }
 </script>
-			<?php
-		}, 999 );
-		
+				<?php
+			},
+			999
+		);
+
 		// Send to CAPI queue
 		$payload = array(
-			'event_id' => 'form_' . $form_id . '_' . time(),
-			'event_time' => time(),
+			'event_id'    => 'form_' . $form_id . '_' . time(),
+			'event_time'  => time(),
 			'custom_data' => array(
 				'form_name' => $form_name,
-				'form_id' => $form_id,
+				'form_id'   => $form_id,
 				'form_type' => 'elementor',
 			),
 		);
-		
+
 		if ( $email && class_exists( 'UP_CAPI' ) ) {
 			$payload['email_hash'] = hash( 'sha256', strtolower( trim( $email ) ) );
 			UP_Events::send_to_capi_for_platforms( 'form_submit', $payload );

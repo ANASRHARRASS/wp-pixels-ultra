@@ -1,0 +1,12 @@
+
+FILE: ...uments/plugins/wp-pixels-ultra/includes/class-up-rest-ingest.php
+----------------------------------------------------------------------
+FOUND 0 ERRORS AND 2 WARNINGS AFFECTING 2 LINES
+----------------------------------------------------------------------
+ 214 | WARNING | error_log() found. Debug code should not normally be
+     |         | used in production.
+ 220 | WARNING | error_log() found. Debug code should not normally be
+     |         | used in production.
+----------------------------------------------------------------------
+
+
