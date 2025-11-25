@@ -200,6 +200,9 @@ class UP_Settings {
 			if ( isset( $input[ $key ] ) ) {
 				$val = $input[ $key ];
 				switch ( $key ) {
+                    case 'tracking_mode':
+                        $out[ $key ] = ( $val === 'pure_s2s' ) ? 'pure_s2s' : 'hybrid';
+                        break;
 					case 'enable_gtm':
 					case 'enable_meta':
 					case 'enable_tiktok':
@@ -304,6 +307,16 @@ class UP_Settings {
 							</select>
 						</td>
 					</tr>
+							<tr>
+								<th scope="row"><label for="tracking_mode">Tracking Mode</label></th>
+								<td>
+									<select name="up_settings[tracking_mode]" id="tracking_mode">
+										<option value="hybrid" <?php selected( $opts['tracking_mode'], 'hybrid' ); ?>>Hybrid (recommended)</option>
+										<option value="pure_s2s" <?php selected( $opts['tracking_mode'], 'pure_s2s' ); ?>>Pure Server-to-Server (no client GTM)</option>
+									</select>
+									<p class="description">Hybrid: client Data Layer + server forwarding. Pure S2S: only server-side events (no client pixels).</p>
+								</td>
+							</tr>
 					<tr>
 						<th scope="row"><label for="meta_pixel_id">Meta Pixel ID</label></th>
 						<td><input name="up_settings[meta_pixel_id]" id="meta_pixel_id" type="text" value="<?php echo esc_attr( $opts['meta_pixel_id'] ); ?>" class="regular-text" /></td>
@@ -452,6 +465,8 @@ class UP_Settings {
 					<p>
 						<button id="up-process-queue" class="button button-primary">Process now</button>
 						<span id="up-process-result" style="margin-left:12px;"></span>
+						<button id="up-send-test-event" class="button" style="margin-left:12px;">Send test event</button>
+						<span id="up-send-test-result" style="margin-left:12px;"></span>
 					</p>
 
 					<h3>Queue Items</h3>
@@ -532,6 +547,34 @@ class UP_Settings {
 					ta.addEventListener('input', updateMappingPreview);
 					updateMappingPreview();
 				}
+			})();
+			(function(){
+				var sendBtn = document.getElementById('up-send-test-event');
+				if (!sendBtn) return;
+				var resultSpan = document.getElementById('up-send-test-result');
+				sendBtn.addEventListener('click', function(e){
+					e.preventDefault();
+					resultSpan.textContent = 'Sending…';
+					var data = new FormData();
+					data.append('action', 'up_send_test_event');
+					data.append('nonce', '<?php echo wp_create_nonce( 'up-send-test' ); ?>');
+					fetch( ajaxurl, {
+						method: 'POST',
+						body: data,
+						credentials: 'same-origin'
+					}).then(function(resp){
+						return resp.json();
+					}).then(function(json){
+						if (json && json.success) {
+							resultSpan.innerHTML = '<span style="color:green">Test sent — response: ' + (json.data.status || 'OK') + '</span>';
+						} else {
+							var msg = (json && json.data && json.data.message) ? json.data.message : 'Unknown error';
+							resultSpan.innerHTML = '<span style="color:red">Failed: ' + msg + '</span>';
+						}
+					}).catch(function(err){
+						resultSpan.innerHTML = '<span style="color:red">Request failed</span>';
+					});
+				});
 			})();
 		</script>
 		<?php
