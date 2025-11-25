@@ -148,12 +148,12 @@ class UP_Loader {
 		check_ajax_referer( 'up-send-test', 'nonce' );
 
 		$event = array(
-			'event'      => 'up_event',
-			'event_name' => 'test_event',
-			'event_id'   => 'test_' . time(),
-			'event_time' => time(),
-			'source_url' => site_url(),
-			'user_data'  => new stdClass(),
+			'event'       => 'up_event',
+			'event_name'  => 'test_event',
+			'event_id'    => 'test_' . time(),
+			'event_time'  => time(),
+			'source_url'  => site_url(),
+			'user_data'   => new stdClass(),
 			'custom_data' => array( 'test' => true ),
 		);
 
@@ -163,7 +163,7 @@ class UP_Loader {
 		$args = array(
 			'headers' => array(
 				'Content-Type' => 'application/json',
-				'X-WP-Nonce'    => $nonce,
+				'X-WP-Nonce'   => $nonce,
 			),
 			'body'    => wp_json_encode( $event ),
 			'timeout' => 15,
@@ -178,9 +178,20 @@ class UP_Loader {
 		$body = wp_remote_retrieve_body( $response );
 
 		if ( $code >= 200 && $code < 300 ) {
-			wp_send_json_success( array( 'status' => $code, 'body' => $body ) );
+			wp_send_json_success(
+				array(
+					'status' => $code,
+					'body'   => $body,
+				)
+			);
 		}
 
-		wp_send_json_error( array( 'status' => $code, 'body' => $body ), $code );
+		wp_send_json_error(
+			array(
+				'status' => $code,
+				'body'   => $body,
+			),
+			$code
+		);
 	}
 }

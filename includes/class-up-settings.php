@@ -200,9 +200,9 @@ class UP_Settings {
 			if ( isset( $input[ $key ] ) ) {
 				$val = $input[ $key ];
 				switch ( $key ) {
-                    case 'tracking_mode':
-                        $out[ $key ] = ( $val === 'pure_s2s' ) ? 'pure_s2s' : 'hybrid';
-                        break;
+					case 'tracking_mode':
+						$out[ $key ] = ( $val === 'pure_s2s' ) ? 'pure_s2s' : 'hybrid';
+						break;
 					case 'enable_gtm':
 					case 'enable_meta':
 					case 'enable_tiktok':
