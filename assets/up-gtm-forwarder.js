@@ -34,24 +34,23 @@
     window.UP_GTM_FORWARD = function (evt) {
       try {
         if (!evt || typeof evt !== 'object') return;
-        
+
         // Create a deep copy to avoid mutating caller's data
         const normalizedEvt = JSON.parse(JSON.stringify(evt));
-        
+
         // Normalize GTM alias: support evt.user but prefer evt.user_data
-        if (evt.user && !evt.user_data) {
-          normalizedEvt.user_data = JSON.parse(JSON.stringify(evt.user));
-        } else if (evt.user_data) {
-          normalizedEvt.user_data = JSON.parse(JSON.stringify(evt.user_data));
+        // Use the deep-copied object consistently (check normalizedEvt, not evt)
+        if (normalizedEvt.user && !normalizedEvt.user_data) {
+          normalizedEvt.user_data = normalizedEvt.user;
         }
-        
+
         // Remove raw PII for privacy; these fields are not sent to the server
         if (normalizedEvt.user_data && typeof normalizedEvt.user_data === 'object') {
           delete normalizedEvt.user_data.email;
           delete normalizedEvt.user_data.phone;
           delete normalizedEvt.user_data.phone_number;
         }
-        
+
         if (!normalizedEvt.event) normalizedEvt.event = normalizedEvt.event_name || 'custom_event';
         sendToIngest(normalizedEvt);
       } catch (e) {
