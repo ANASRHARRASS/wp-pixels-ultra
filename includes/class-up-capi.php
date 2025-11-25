@@ -475,9 +475,9 @@ class UP_CAPI {
 			}
 			if ( isset( $e['user_data'] ) && is_array( $e['user_data'] ) ) {
 				foreach ( $e['user_data'] as $k => $v ) {
-					if ( $k === 'email_hash' ) {
+					if ( 'email_hash' === $k ) {
 						$item['user_data']['em'] = $v;
-					} elseif ( $k === 'phone_hash' ) {
+					} elseif ( 'phone_hash' === $k ) {
 						$item['user_data']['ph'] = $v;
 					} else {
 						$item['user_data'][ $k ] = $v;
@@ -511,7 +511,7 @@ class UP_CAPI {
 	 * @return array|WP_Error|WP_HTTP_Response
 	 */
 	protected static function send_to_tiktok( $pixel_id, $access_token, $events = array(), $blocking = true ) {
-		// Use TikTok Business API endpoint; structure may need adjustment by integrator
+		// Use TikTok Business API endpoint; structure may need adjustment by integrator.
 		$url  = 'https://business-api.tiktok.com/open_api/v1.2/pixel/track/';
 		$body = array(
 			'pixel_code' => $pixel_id,
@@ -531,9 +531,9 @@ class UP_CAPI {
 			}
 			if ( isset( $e['user_data'] ) && is_array( $e['user_data'] ) ) {
 				foreach ( $e['user_data'] as $k => $v ) {
-					if ( $k === 'email_hash' ) {
+					if ( 'email_hash' === $k ) {
 						$item['user']['em'] = $v;
-					} elseif ( $k === 'phone_hash' ) {
+					} elseif ( 'phone_hash' === $k ) {
 						$item['user']['ph'] = $v;
 					} else {
 						$item['user'][ $k ] = $v;
@@ -544,7 +544,7 @@ class UP_CAPI {
 		}
 		$headers = array( 'Content-Type' => 'application/json' );
 		if ( ! empty( $access_token ) ) {
-			// TikTok accepts access_token either in query or header depending on setup; prefer header for privacy
+			// TikTok accepts access_token either in query or header depending on setup; prefer header for privacy.
 			$headers['Access-Token'] = $access_token;
 		}
 		$args     = array(
@@ -609,7 +609,7 @@ class UP_CAPI {
 			if ( isset( $e['user_data'] ) && is_array( $e['user_data'] ) ) {
 				foreach ( $e['user_data'] as $k => $v ) {
 					if ( in_array( $k, array( 'email_hash', 'phone_hash' ), true ) ) {
-						$ec['user_data'][ $k ] = $v; // already hashed
+						$ec['user_data'][ $k ] = $v; // already hashed.
 					}
 				}
 			}

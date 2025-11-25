@@ -1,10 +1,27 @@
 <?php
-if ( ! defined( 'ABSPATH' ) ) {
-	exit; }
+/**
+ * UP_REST
+ *
+ * REST API routes and handlers for the Ultra Pixels plugin.
+ *
+ * @package WP_Pixels_Ultra
+ */
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+/**
+ * REST endpoint registrations and request handlers.
+ */
 class UP_REST {
+	/**
+	 * Register plugin REST routes.
+	 *
+	 * @return void
+	 */
 	public static function register_routes() {
-		// NOTE: /ingest route moved to class-up-rest-ingest.php for GTM forwarder
+		// NOTE: /ingest route moved to class-up-rest-ingest.php for GTM forwarder.
 		// register_rest_route( 'up/v1', '/ingest', array(
 		// 'methods' => 'POST',
 		// 'callback' => array( __CLASS__, 'ingest' ),
@@ -22,7 +39,7 @@ class UP_REST {
 			)
 		);
 
-		// process queue (admin-only)
+		// Process queue (admin-only).
 		register_rest_route(
 			'up/v1',
 			'/process-queue',
@@ -34,7 +51,7 @@ class UP_REST {
 			)
 		);
 
-		// queue status (admin-only)
+		// Queue status (admin-only).
 		register_rest_route(
 			'up/v1',
 			'/queue/status',
@@ -46,7 +63,7 @@ class UP_REST {
 			)
 		);
 
-		// admin: list queue items
+		// Admin: list queue items.
 		register_rest_route(
 			'up/v1',
 			'/queue/items',
@@ -58,7 +75,7 @@ class UP_REST {
 			)
 		);
 
-		// admin: list dead-letter items
+		// Admin: list dead-letter items.
 		register_rest_route(
 			'up/v1',
 			'/queue/deadletter',
@@ -70,7 +87,7 @@ class UP_REST {
 			)
 		);
 
-		// admin: retry dead-letter item (move back to queue)
+		// Admin: retry dead-letter item (move back to queue).
 		register_rest_route(
 			'up/v1',
 			'/queue/deadletter/retry',
@@ -82,7 +99,7 @@ class UP_REST {
 			)
 		);
 
-		// admin: delete dead-letter item
+		// Admin: delete dead-letter item.
 		register_rest_route(
 			'up/v1',
 			'/queue/deadletter/delete',
@@ -94,7 +111,7 @@ class UP_REST {
 			)
 		);
 
-		// admin: get logs
+		// Admin: get logs.
 		register_rest_route(
 			'up/v1',
 			'/logs',
@@ -106,7 +123,7 @@ class UP_REST {
 			)
 		);
 
-		// admin: retry item
+		// Admin: retry item.
 		register_rest_route(
 			'up/v1',
 			'/queue/retry',
@@ -118,7 +135,7 @@ class UP_REST {
 			)
 		);
 
-		// admin: delete item
+		// Admin: delete item.
 		register_rest_route(
 			'up/v1',
 			'/queue/delete',
@@ -130,7 +147,7 @@ class UP_REST {
 			)
 		);
 
-		// public health/diagnostics (non-sensitive) — safe for uptime checks
+		// Public health/diagnostics (non-sensitive) — safe for uptime checks.
 		register_rest_route(
 			'up/v1',
 			'/health',
@@ -142,6 +159,16 @@ class UP_REST {
 		);
 	}
 
+	/**
+	 * Ingest events via REST request.
+	 *
+	 * Performs authorization (server secret, REST nonce or same-origin),
+	 * basic rate-limiting and enqueues events for async processing.
+	 *
+	 * @param WP_REST_Request $request REST request object.
+	 *
+	 * @return WP_REST_Response
+	 */
 	public static function ingest( WP_REST_Request $request ) {
 		$headers         = $request->get_headers();
 		$incoming_secret = isset( $headers['x-up-secret'] ) ? ( is_array( $headers['x-up-secret'] ) ? $headers['x-up-secret'][0] : $headers['x-up-secret'] ) : '';
@@ -149,22 +176,22 @@ class UP_REST {
 
 		$stored = defined( 'UP_SERVER_SECRET' ) ? UP_SERVER_SECRET : UP_Settings::get( 'server_secret', '' );
 
-		// Accept in priority: server secret, WP REST nonce, or same-origin anonymous (strictly rate-limited)
+		// Accept in priority: server secret, WP REST nonce, or same-origin anonymous (strictly rate-limited).
 		$authorized = false;
 		if ( ! empty( $stored ) && ! empty( $incoming_secret ) && hash_equals( (string) $stored, (string) $incoming_secret ) ) {
-			$authorized = true; // token-based
+			$authorized = true; // Token-based.
 		} elseif ( ! empty( $incoming_nonce ) && wp_verify_nonce( $incoming_nonce, 'wp_rest' ) ) {
-			$authorized = true; // logged-in REST nonce
+			$authorized = true; // Logged-in REST nonce.
 		} else {
-			// Fallback for anonymous front-end: require same-origin request (Origin/Referer host matches site)
-			$site_host = parse_url( home_url(), PHP_URL_HOST );
+			// Fallback for anonymous front-end: require same-origin request (Origin/Referer host matches site).
+			$site_host = wp_parse_url( home_url(), PHP_URL_HOST );
 			$origin    = isset( $_SERVER['HTTP_ORIGIN'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_ORIGIN'] ) ) : '';
 			$referer   = isset( $_SERVER['HTTP_REFERER'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_REFERER'] ) ) : '';
 			$hdr       = $origin ? $origin : $referer;
 			if ( $hdr ) {
-				$hdr_host = parse_url( $hdr, PHP_URL_HOST );
-				if ( $hdr_host && $site_host && strcasecmp( $hdr_host, $site_host ) === 0 ) {
-					$authorized = true; // same-origin anonymous
+				$hdr_host = wp_parse_url( $hdr, PHP_URL_HOST );
+				if ( $hdr_host && $site_host && 0 === strcasecmp( $hdr_host, $site_host ) ) {
+					$authorized = true; // same-origin anonymous.
 				}
 			}
 		}
@@ -173,8 +200,8 @@ class UP_REST {
 			return new WP_REST_Response( array( 'error' => 'Unauthorized' ), 401 );
 		}
 
-		// Basic rate-limiting to reduce abuse: per-IP and per-token counters using transients
-		// Configure limits via UP_Settings keys: 'rate_limit_ip_per_min' and 'rate_limit_token_per_min'
+		// Basic rate-limiting to reduce abuse: per-IP and per-token counters using transients.
+		// Configure limits via UP_Settings keys: 'rate_limit_ip_per_min' and 'rate_limit_token_per_min'.
 		$ip       = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '0.0.0.0';
 		$ip_key   = 'up_ingest_ip_' . md5( $ip );
 		$ip_limit = 60;
@@ -235,12 +262,12 @@ class UP_REST {
 			return new WP_REST_Response( array( 'error' => 'Empty or invalid payload' ), 400 );
 		}
 
-		// Optional consent check (if client provides consent flag and it's false, reject)
-		if ( isset( $payload['consent'] ) && $payload['consent'] !== true && $payload['consent'] !== 'true' ) {
+		// Optional consent check (if client provides consent flag and it's false, reject).
+		if ( isset( $payload['consent'] ) && true !== $payload['consent'] && 'true' !== $payload['consent'] ) {
 			return new WP_REST_Response( array( 'error' => 'Consent required' ), 403 );
 		}
 
-		// Server-side PII hashing: convert email/phone to hashed fields and remove raw values
+		// Server-side PII hashing: convert email/phone to hashed fields and remove raw values.
 		if ( isset( $payload['user_data'] ) && is_array( $payload['user_data'] ) ) {
 			$ud    = $payload['user_data'];
 			$clean = array();
@@ -255,16 +282,16 @@ class UP_REST {
 			$payload['user_data'] = $clean;
 		}
 
-		// Normalize optional source URL for adapters
+		// Normalize optional source URL for adapters.
 		if ( empty( $payload['source_url'] ) ) {
 			$payload['source_url'] = isset( $_SERVER['HTTP_REFERER'] ) ? esc_url_raw( wp_unslash( $_SERVER['HTTP_REFERER'] ) ) : home_url();
 		}
 
-		// Normalize platform and event_name
+		// Normalize platform and event_name.
 		$platform   = isset( $payload['platform'] ) ? sanitize_text_field( $payload['platform'] ) : 'generic';
 		$event_name = isset( $payload['event_name'] ) ? sanitize_text_field( $payload['event_name'] ) : ( isset( $payload['event'] ) ? sanitize_text_field( $payload['event'] ) : 'event' );
 
-		// Enqueue event for async processing using UP_CAPI
+		// Enqueue event for async processing using UP_CAPI.
 		if ( class_exists( 'UP_CAPI' ) && method_exists( 'UP_CAPI', 'enqueue_event' ) ) {
 			$ok = UP_CAPI::enqueue_event( $platform, $event_name, $payload );
 			if ( $ok ) {
@@ -294,6 +321,13 @@ class UP_REST {
 		);
 	}
 
+	/**
+	 * Test forward endpoint for admins.
+	 *
+	 * @param WP_REST_Request $request REST request.
+	 *
+	 * @return WP_REST_Response
+	 */
 	public static function test_forward( WP_REST_Request $request ) {
 		$params    = $request->get_json_params();
 		$event_key = isset( $params['event'] ) ? sanitize_text_field( $params['event'] ) : 'purchase';
@@ -311,7 +345,7 @@ class UP_REST {
 
 		$results = array();
 		if ( class_exists( 'UP_CAPI' ) ) {
-			// test endpoint should attempt an immediate blocking send
+			// Test endpoint should attempt an immediate blocking send.
 			$results[] = UP_CAPI::send_event( 'test', $event_key, $sample, true );
 		}
 
@@ -324,6 +358,13 @@ class UP_REST {
 		);
 	}
 
+	/**
+	 * Trigger processing of the event queue (admin-only).
+	 *
+	 * @param WP_REST_Request $request REST request.
+	 *
+	 * @return WP_REST_Response
+	 */
 	public static function process_queue( WP_REST_Request $request ) {
 		if ( ! class_exists( 'UP_CAPI' ) ) {
 			return new WP_REST_Response( array( 'error' => 'no_capi' ), 500 );
@@ -340,6 +381,13 @@ class UP_REST {
 		);
 	}
 
+	/**
+	 * Return queue status (length and last processed timestamp).
+	 *
+	 * @param WP_REST_Request $request REST request.
+	 *
+	 * @return WP_REST_Response
+	 */
 	public static function queue_status( WP_REST_Request $request ) {
 		if ( ! class_exists( 'UP_CAPI' ) ) {
 			return new WP_REST_Response( array( 'error' => 'no_capi' ), 500 );
@@ -356,6 +404,13 @@ class UP_REST {
 		);
 	}
 
+	/**
+	 * List queued items with pagination.
+	 *
+	 * @param WP_REST_Request $request REST request.
+	 *
+	 * @return WP_REST_Response
+	 */
 	public static function queue_items( WP_REST_Request $request ) {
 		$limit  = intval( $request->get_param( 'limit' ) ?? 20 );
 		$offset = intval( $request->get_param( 'offset' ) ?? 0 );
@@ -372,6 +427,13 @@ class UP_REST {
 		);
 	}
 
+	/**
+	 * List dead-letter items with pagination.
+	 *
+	 * @param WP_REST_Request $request REST request.
+	 *
+	 * @return WP_REST_Response
+	 */
 	public static function deadletter_items( WP_REST_Request $request ) {
 		$limit  = intval( $request->get_param( 'limit' ) ?? 20 );
 		$offset = intval( $request->get_param( 'offset' ) ?? 0 );
@@ -391,6 +453,13 @@ class UP_REST {
 		);
 	}
 
+	/**
+	 * Retry a dead-letter item (reinsert to queue).
+	 *
+	 * @param WP_REST_Request $request REST request.
+	 *
+	 * @return WP_REST_Response
+	 */
 	public static function deadletter_retry( WP_REST_Request $request ) {
 		$params = $request->get_json_params();
 		$id     = isset( $params['id'] ) ? intval( $params['id'] ) : 0;
@@ -407,6 +476,13 @@ class UP_REST {
 		return new WP_REST_Response( array( 'ok' => (bool) $ok ), 200 );
 	}
 
+	/**
+	 * Delete a dead-letter entry.
+	 *
+	 * @param WP_REST_Request $request REST request.
+	 *
+	 * @return WP_REST_Response
+	 */
 	public static function deadletter_delete( WP_REST_Request $request ) {
 		$params = $request->get_json_params();
 		$id     = isset( $params['id'] ) ? intval( $params['id'] ) : 0;
@@ -423,6 +499,13 @@ class UP_REST {
 		return new WP_REST_Response( array( 'ok' => (bool) $ok ), 200 );
 	}
 
+	/**
+	 * Return recent plugin logs for admin troubleshooting.
+	 *
+	 * @param WP_REST_Request $request REST request.
+	 *
+	 * @return WP_REST_Response
+	 */
 	public static function logs( WP_REST_Request $request ) {
 		if ( ! class_exists( 'UP_CAPI' ) ) {
 			return new WP_REST_Response( array( 'error' => 'no_capi' ), 500 );
@@ -440,6 +523,13 @@ class UP_REST {
 		);
 	}
 
+	/**
+	 * Retry specific queued items.
+	 *
+	 * @param WP_REST_Request $request REST request.
+	 *
+	 * @return WP_REST_Response
+	 */
 	public static function queue_retry( WP_REST_Request $request ) {
 		$params = $request->get_json_params();
 		$id     = isset( $params['id'] ) ? intval( $params['id'] ) : 0;
@@ -453,6 +543,13 @@ class UP_REST {
 		return new WP_REST_Response( array( 'ok' => (bool) $ok ), 200 );
 	}
 
+	/**
+	 * Delete specific queued items.
+	 *
+	 * @param WP_REST_Request $request REST request.
+	 *
+	 * @return WP_REST_Response
+	 */
 	public static function queue_delete( WP_REST_Request $request ) {
 		$params = $request->get_json_params();
 		$id     = isset( $params['id'] ) ? intval( $params['id'] ) : 0;
@@ -479,24 +576,27 @@ class UP_REST {
 			$queue_len = UP_CAPI::get_queue_length();
 			global $wpdb;
 			$dl_table = $wpdb->prefix . 'up_capi_deadletter';
-			if ( $wpdb->get_var( "SHOW TABLES LIKE '{$dl_table}'" ) === $dl_table ) {
-				$deadletter_len = intval( $wpdb->get_var( "SELECT COUNT(1) FROM {$dl_table}" ) );
+			// Check table existence via prepared LIKE to avoid interpolated table names.
+			$like = $wpdb->esc_like( $dl_table );
+			$row  = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $like ) );
+			if ( $row === $dl_table ) {
+				$deadletter_len = intval( $wpdb->get_var( 'SELECT COUNT(1) FROM ' . esc_sql( $dl_table ) ) );
 			}
 		}
 		$platforms = array();
 		if ( class_exists( 'UP_Settings' ) ) {
 			$platforms = array(
-				'meta'       => UP_Settings::get( 'enable_meta', 'no' ) === 'yes',
-				'tiktok'     => UP_Settings::get( 'enable_tiktok', 'no' ) === 'yes',
-				'google_ads' => UP_Settings::get( 'enable_google_ads', 'no' ) === 'yes',
-				'snapchat'   => UP_Settings::get( 'enable_snapchat', 'no' ) === 'yes',
-				'pinterest'  => UP_Settings::get( 'enable_pinterest', 'no' ) === 'yes',
+				'meta'       => 'yes' === UP_Settings::get( 'enable_meta', 'no' ),
+				'tiktok'     => 'yes' === UP_Settings::get( 'enable_tiktok', 'no' ),
+				'google_ads' => 'yes' === UP_Settings::get( 'enable_google_ads', 'no' ),
+				'snapchat'   => 'yes' === UP_Settings::get( 'enable_snapchat', 'no' ),
+				'pinterest'  => 'yes' === UP_Settings::get( 'enable_pinterest', 'no' ),
 			);
 		}
 		$logs = array();
 		if ( class_exists( 'UP_CAPI' ) && method_exists( 'UP_CAPI', 'get_logs' ) ) {
 			$all  = UP_CAPI::get_logs();
-			$logs = array_slice( $all, 0, 10 ); // recent 10
+			$logs = array_slice( $all, 0, 10 ); // Recent 10 entries.
 		}
 		return new WP_REST_Response(
 			array(
@@ -512,7 +612,13 @@ class UP_REST {
 		);
 	}
 
-	// Simple admin renderer for queue dashboard (can be expanded into full SPA)
+	/**
+	 * Simple admin renderer for queue dashboard.
+	 *
+	 * Can be expanded into a full SPA for richer admin interactions.
+	 *
+	 * @return void
+	 */
 	public static function render_queue_dashboard() {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
