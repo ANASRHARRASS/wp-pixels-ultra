@@ -33,7 +33,7 @@
     "@types/node": "^24.10.1",
     "babel-loader": "^9.1.0",
     "eslint": "^8.50.0",
-    "eslint-config-prettier": "^9.0.0",
+    "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.0.0",
     "prettier": "^3.0.0",
     "typescript": "^5.2.0",
