@@ -52,13 +52,19 @@ class UP_Plugin {
 	}
 
 	public static function instance() {
-		if ( self::$instance === null ) {
+		if ( null === self::$instance ) {
 			self::$instance = new self();
 		}
 		return self::$instance;
 	}
 
-	// register a callback for a named custom event
+	/**
+	 * Register a callback for a named custom event.
+	 *
+	 * @param string   $name     Event name.
+	 * @param callable $callback Callable to execute when event is triggered.
+	 * @return bool True on success, false on failure.
+	 */
 	public function register_event( $name, $callback ) {
 		$name = (string) $name;
 		if ( empty( $name ) || ! is_callable( $callback ) ) {
@@ -71,7 +77,15 @@ class UP_Plugin {
 		return true;
 	}
 
-	// trigger a named event with optional data (calls registered callbacks and fires WP action)
+	/**
+	 * Trigger a named event with optional data.
+	 *
+	 * Calls registered callbacks and fires the `up_event_triggered` WP action.
+	 *
+	 * @param string $name Event name.
+	 * @param array  $data Optional event data.
+	 * @return void
+	 */
 	public function trigger_event( $name, $data = array() ) {
 		$name = (string) $name;
 		if ( isset( $this->events[ $name ] ) && is_array( $this->events[ $name ] ) ) {
@@ -79,14 +93,20 @@ class UP_Plugin {
 				try {
 					call_user_func( $cb, $data );
 				} catch ( Exception $e ) {
-					error_log( '[UP] event handler error for ' . $name . ': ' . $e->getMessage() );
+					if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+						error_log( '[UP] event handler error for ' . $name . ': ' . $e->getMessage() );
+					}
 				}
 			}
 		}
 		do_action( 'up_event_triggered', $name, $data );
 	}
 
-	// REST route for testing/triggering events (admin only)
+	/**
+	 * Register REST routes for the plugin.
+	 *
+	 * @return void
+	 */
 	public function register_rest_routes() {
 		register_rest_route(
 			'up/v1',
@@ -101,6 +121,12 @@ class UP_Plugin {
 		);
 	}
 
+	/**
+	 * REST callback to trigger a registered event.
+	 *
+	 * @param WP_REST_Request $request REST request.
+	 * @return WP_REST_Response
+	 */
 	public function rest_trigger( WP_REST_Request $request ) {
 		$params = $request->get_json_params();
 		$event  = isset( $params['event'] ) ? sanitize_text_field( $params['event'] ) : '';
@@ -141,7 +167,9 @@ register_activation_hook(
 		$table_name      = $wpdb->prefix . 'up_capi_queue';
 		$dl_table        = $wpdb->prefix . 'up_capi_deadletter';
 
-		if ( $wpdb->get_var( "SHOW TABLES LIKE '" . esc_sql( $table_name ) . "'" ) !== $table_name ) {
+		$like = $wpdb->esc_like( $table_name );
+		$row  = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $like ) );
+		if ( $row !== $table_name ) {
 			$sql = 'CREATE TABLE ' . $table_name . ' (
             id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
             platform VARCHAR(50) NOT NULL,
@@ -159,7 +187,9 @@ register_activation_hook(
 			dbDelta( $sql );
 		}
 
-		if ( $wpdb->get_var( "SHOW TABLES LIKE '" . esc_sql( $dl_table ) . "'" ) !== $dl_table ) {
+		$like_dl = $wpdb->esc_like( $dl_table );
+		$row_dl  = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $like_dl ) );
+		if ( $row_dl !== $dl_table ) {
 			$sql = 'CREATE TABLE ' . $dl_table . ' (
             id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
             platform VARCHAR(50) NOT NULL,
