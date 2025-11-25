@@ -1,6 +1,7 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) {
-	exit; }
+    exit;
+}
 
 class UP_CAPI {
 	const QUEUE_OPTION = 'up_capi_queue';
