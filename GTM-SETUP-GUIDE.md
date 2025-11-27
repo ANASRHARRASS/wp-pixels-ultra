@@ -311,29 +311,36 @@ Enable Meta: Yes
 - Use Meta Test Events tool in Events Manager
 - Verify events appear with `event_id` and match client events
 
-### TikTok Events API
+### TikTok Pixel + Events API (browser + server, no GTM server-side)
+
+**Goal:** Let GTM handle the browser pixel while the plugin sends Events API server calls (deduped via `event_id`). No GTM Server container is required.
 
 **WordPress Plugin Settings:**
 ```
 TikTok Pixel ID: XXXXXXXXXXXXXX
 Enable TikTok: Yes
+Let GTM manage all client pixels: Yes (prevents plugin from injecting the browser pixel)
+TikTok CAPI Token: <Events API token from TikTok>
 ```
 
-**GTM Setup:**
-- TikTok Pixel loads automatically via plugin
-- GTM tags use `window.ttq` to track events
-- Event names mapped to TikTok standards
+**GTM Setup (browser pixel):**
+- Use the official **TikTok Pixel** GTM template (recommended) or a Custom HTML tag.
+- Trigger: `up_event` Custom Event (or filtered per event_name).
+- Map: Event Name (lookup from `event_name`), Value, Currency, Event ID, Contents/Item IDs, Email/Phone if available.
+- Leave the **Events API** option off in the GTM tag because server delivery is handled by the plugin.
 
-**Access Token (for Server-Side):**
-1. Go to TikTok Events Manager
-2. Settings → Events API
-3. Generate Access Token
-4. Add to WordPress: Ultra Pixels → CAPI Token
+**Access Token (for Events API via plugin):**
+1. Go to **TikTok Events Manager → Settings → Events API**.
+2. Generate an **Access Token**.
+3. Add it in WordPress under **Ultra Pixels → TikTok CAPI Token** and save.
+
+**Deduplication best practice:**
+- The plugin sends server events with the same `event_id` provided in `up_event` (e.g., `order_<id>` for purchases).
+- In your GTM tag, set **Event ID** to the `event_id` dataLayer variable so TikTok can dedupe browser vs. server events.
 
 **Verify Events:**
-- Check TikTok Events Manager
-- Use Test Events feature
-- Validate event_id deduplication works
+- Open TikTok **Test Events** and perform a checkout. You should see both browser and Events API entries sharing the same Event ID.
+- Confirm no duplicate pixel injection (view source: only GTM loads TikTok).
 
 ### Google Ads Conversion Tracking
 
