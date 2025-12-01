@@ -91,12 +91,15 @@ Create these DataLayer Variables (Variables → New → Data Layer Variable):
 |--------------|-------------------------|---------------|
 | DLV - Event Name | event_name | - |
 | DLV - Event ID | event_id | - |
+| DLV - Fallback Event ID | dlv_event_id | - |
 | DLV - Event Time | event_time | - |
 | DLV - Value | custom_data.value | 0 |
 | DLV - Currency | custom_data.currency | USD |
 | DLV - Content IDs | custom_data.content_ids | [] |
 | DLV - Custom Data | custom_data | - |
 | DLV - User Data | user_data | - |
+| DLV - WhatsApp Href | custom_data.href | - |
+| DLV - WhatsApp Label | custom_data.content_name | - |
 
 Create these Constant Variables:
 
@@ -115,8 +118,12 @@ function() {
     'purchase': 'PlaceAnOrder',
     'add_to_cart': 'AddToCart',
     'view_item': 'ViewContent',
+    'add_payment_info': 'AddPaymentInfo',
+    'view_item_list': 'BrowseCategory',
     'begin_checkout': 'InitiateCheckout',
     'whatsapp_initiate': 'Contact',
+    'whatsapp_click': 'Contact',
+    'whatsapp_lead_click': 'Contact',
     'form_submit': 'SubmitForm',
     'PageView': 'PageView'
   };
@@ -311,29 +318,156 @@ Enable Meta: Yes
 - Use Meta Test Events tool in Events Manager
 - Verify events appear with `event_id` and match client events
 
-### TikTok Events API
+### TikTok Pixel + Events API (browser + server, no GTM server-side)
+
+**Goal:** Run the browser pixel from GTM (Custom HTML) while the plugin sends Events API calls directly from WordPress. No GTM server container or TikTok GTM template is required.
 
 **WordPress Plugin Settings:**
 ```
 TikTok Pixel ID: XXXXXXXXXXXXXX
 Enable TikTok: Yes
+Let GTM manage all client pixels: Yes (prevents plugin from injecting the browser pixel)
+TikTok CAPI Token: <Events API token from TikTok>
 ```
 
-**GTM Setup:**
-- TikTok Pixel loads automatically via plugin
-- GTM tags use `window.ttq` to track events
-- Event names mapped to TikTok standards
+**GTM prerequisites (variables + triggers):**
+- Data Layer Variables: `event_name`, `event_id`, `event_time`, `custom_data`, `user_data`, `custom_data.content_ids`, `custom_data.value`, `custom_data.currency` (default USD). Optional extras if you want to display them in the tag: `custom_data.content_name`, `custom_data.content_type`, `custom_data.price`, `custom_data.description`, `custom_data.href`, `custom_data.event_source_url`, plus `dlv_event_id` for fallback deduplication.
+- Custom JS Variable: TikTok event mapper that converts `view_item` → `ViewContent`, `add_to_cart` → `AddToCart`, `begin_checkout` → `InitiateCheckout`, `add_payment_info` → `AddPaymentInfo`, `purchase` → `PlaceAnOrder`, `view_item_list` → `BrowseCategory`, `whatsapp_initiate` → `Contact`, `whatsapp_click`/`whatsapp_lead_click` → `Contact` (rename to `WhatsAppLead` if you prefer a custom event).
+- Triggers: **All Pages - PageView** and **Ultra Pixels Custom Event** (`up_event`).
 
-**Access Token (for Server-Side):**
-1. Go to TikTok Events Manager
-2. Settings → Events API
-3. Generate Access Token
-4. Add to WordPress: Ultra Pixels → CAPI Token
+**Default Meta/TikTok event mapping (plugin source):**
+```json
+{
+  "purchase": {
+    "meta": {"event_name": "Purchase", "include_user_data": true},
+    "tiktok": {"event_name": "PlaceAnOrder", "include_user_data": true}
+  },
+  "add_to_cart": {
+    "meta": {"event_name": "AddToCart", "include_user_data": false},
+    "tiktok": {"event_name": "AddToCart", "include_user_data": false}
+  },
+  "view_item": {
+    "meta": {"event_name": "ViewContent", "include_user_data": false},
+    "tiktok": {"event_name": "ViewContent", "include_user_data": false}
+  },
+  "view_item_list": {
+    "meta": {"event_name": "ViewCategory", "include_user_data": false},
+    "tiktok": {"event_name": "BrowseCategory", "include_user_data": false}
+  },
+  "begin_checkout": {
+    "meta": {"event_name": "InitiateCheckout", "include_user_data": false},
+    "tiktok": {"event_name": "InitiateCheckout", "include_user_data": false}
+  },
+  "add_payment_info": {
+    "meta": {"event_name": "AddPaymentInfo", "include_user_data": true},
+    "tiktok": {"event_name": "AddPaymentInfo", "include_user_data": true}
+  },
+  "whatsapp_initiate": {
+    "meta": {"event_name": "Contact", "include_user_data": true},
+    "tiktok": {"event_name": "Contact", "include_user_data": true}
+  },
+  "whatsapp_click": {
+    "meta": {"event_name": "Contact", "include_user_data": false},
+    "tiktok": {"event_name": "Contact", "include_user_data": false}
+  }
+}
+```
+Use this mapping when configuring your Custom JS variable or Lookup Tables so GTM tags stay aligned with the plugin’s Events API payloads.
+
+**GTM Tags (Custom HTML, no TikTok template):**
+- **TikTok Pixel – PageView**
+  - HTML:
+    ```html
+    <script>
+      if (window.ttq) {
+        ttq.track('PageView', {
+          event_id: {{DLV - Event ID}},
+          url: {{Page URL}}
+        });
+      }
+    </script>
+    ```
+  - Trigger: All Pages - PageView.
+
+- **TikTok Pixel – Dynamic Events**
+  - HTML:
+    ```html
+    <script>
+      if (window.ttq && {{DLV - TikTok Event Name}}) {
+        var base = {{DLV - Custom Data}} || {};
+        var eventData = Object.assign({
+          value: {{DLV - Value}} || 0,
+          currency: {{DLV - Currency}} || 'USD',
+          content_ids: {{DLV - Content IDs}} || [],
+          content_type: base.content_type || 'product',
+          content_name: base.content_name,
+          content_category: base.content_category,
+          href: {{DLV - WhatsApp Href}},
+          price: base.price,
+          description: base.description,
+          url: base.event_source_url || {{Page URL}},
+          event_id: {{DLV - Event ID}} || {{DLV - Fallback Event ID}} || {{DLV - WhatsApp Label}}
+        }, base);
+
+        // Include user data for better match (email/phone/ip/user_agent from plugin where available)
+        if ({{DLV - User Data}}) {
+          eventData.user = {{DLV - User Data}};
+        }
+
+        ttq.track({{DLV - TikTok Event Name}}, eventData);
+      }
+    </script>
+    ```
+  - Trigger: Ultra Pixels Custom Event.
+
+**Event mapping + payload expectations:**
+- **ViewContent** (`view_item`): `value`, `currency`, `content_ids`, `content_type`, `content_name`, `content_category`, `price`, `description`, `event_time`, `url`, plus user info (`email`, `phone`, `external_id`, `ip`, `user_agent`, `ttclid`) when present.
+- **AddToCart** (`add_to_cart`): same as above with `event_id` populated for deduplication.
+- **ViewCategory/BrowseCategory** (`view_item_list`): `content_ids`, `content_category`, `event_time`, `url`, optional user info if available from the plugin payload.
+- **InitiateCheckout** (`begin_checkout`): `value`, `currency`, `content_ids`, `content_type`, `content_name`, `event_id`, `event_time`, `url`, user info.
+- **AddPaymentInfo** (`add_payment_info`): same as above with payment step context when provided by the theme/checkout.
+- **Purchase** (`purchase`): `value`, `currency`, `content_ids`, `content_type`, `content_name`, `event_id`, `event_time`, `url`, user info; transaction amount will populate `value`.
+- **WhatsApp Lead** (`whatsapp_initiate` or `whatsapp_click`): send as `Contact` or rename the TikTok event to `WhatsAppLead` in the mapper; payload can include `value`, `currency`, `content_name` (e.g., button label), `href`/`url`, and `event_id` or `dlv_event_id` for dedupe.
+
+**WhatsApp buttons: step-by-step GTM wiring (browser pixel + plugin Events API)**
+1. **Add attributes in Elementor/HTML** to every WhatsApp CTA so the plugin pushes an `up_event` with WhatsApp context (no GTM template needed):
+   ```
+   data-up-event="whatsapp_click"
+   data-up-payload='{"content_name":"WhatsApp CTA","content_category":"whatsapp","href":"https://wa.me/212703914377?text=Hi"}'
+   ```
+   - `content_name` becomes the TikTok `content_name`/label, `href` becomes the URL. Add `value` if you want to pass revenue attribution.
+2. **Data Layer Variables**: double-check GTM has `DLV - Event Name` (`event_name`), `DLV - WhatsApp Href` (`custom_data.href`), `DLV - WhatsApp Label` (`custom_data.content_name`), and `DLV - Fallback Event ID` (`dlv_event_id`). If `event_id` is missing in the payload, `dlv_event_id` keeps dedupe intact.
+3. **TikTok mapper**: keep `whatsapp_click`/`whatsapp_lead_click` mapped to `Contact` (or rename to `WhatsAppLead`), and ensure the mapper returns `PageView` only when the incoming `event_name` is truly `PageView`.
+4. **Dynamic TikTok tag**: include
+   ```
+   event_id: {{DLV - Event ID}} || {{DLV - Fallback Event ID}} || {{DLV - WhatsApp Label}}
+   ```
+   inside the payload. If the tag still shows `PageView`, add a blocking rule so the **TikTok Pixel – Dynamic Events** tag fires only when `{{DLV - Event Name}}` does **not** equal `PageView`.
+5. **Trigger**: use `Ultra Pixels Custom Event` so the tag fires on `up_event` (the WhatsApp click). The PageView trigger should be used only by the pageview tag.
+6. **Test with GTM Preview**:
+   - Click the WhatsApp button and open the event in GTM preview. The **Summary → Event Name** should read `whatsapp_click` or `whatsapp_lead_click`, not `PageView`.
+   - Under **Data Layer**, confirm `event_name`, `dlv_event_id`, and `custom_data.href` are present.
+   - Verify only the **TikTok Pixel – Dynamic Events** tag fires (not the PageView tag). If `PageView` appears instead, the HTML lacked `data-up-event`, or a cache/minifier removed the attribute—re-add it and retest.
+7. **TikTok Test Events**: perform a live click and check that the browser event uses the same Event ID the plugin sends via Events API. If the IDs differ, add `{{DLV - Fallback Event ID}}` to the payload and re-test.
+
+**WhatsApp troubleshooting checklist (when GTM shows PageView instead of WhatsApp):**
+- Confirm the rendered HTML still contains `data-up-event="whatsapp_click"` (view source or DevTools Elements). Some cache/minify plugins strip attributes; whitelist `data-up-*` if needed.
+- In GTM Preview, ensure **Event Name** equals `whatsapp_click`; if it reads `PageView`, the attributes are missing on the clicked element.
+- Make sure your **Ultra Pixels Custom Event** trigger listens for `up_event` and that your dynamic tag does **not** also use the PageView trigger.
+- Enable the `dlv_event_id` variable in the GTM debug panel to see the fallback ID the plugin provides for WhatsApp clicks.
+
+**Access Token (for Events API via plugin):**
+1. Go to **TikTok Events Manager → Settings → Events API**.
+2. Generate an **Access Token**.
+3. Add it in WordPress under **Ultra Pixels → TikTok CAPI Token** and save.
+
+**Deduplication best practice:**
+- The plugin sends server Events API calls with the same `event_id` provided in `up_event` (e.g., `order_<id>` for purchases).
+- In your GTM tag, set **event_id** to the `event_id` dataLayer variable so TikTok can dedupe browser vs. server events.
 
 **Verify Events:**
-- Check TikTok Events Manager
-- Use Test Events feature
-- Validate event_id deduplication works
+- Open TikTok **Test Events** and perform a checkout. You should see browser and Events API entries sharing the same Event ID and payload fields above.
+- Confirm no duplicate pixel injection (view source: only GTM loads TikTok). If you see duplicates, ensure **Let GTM manage all client pixels** stays enabled.
 
 ### Google Ads Conversion Tracking
 
