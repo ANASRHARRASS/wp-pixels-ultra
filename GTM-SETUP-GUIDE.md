@@ -91,12 +91,15 @@ Create these DataLayer Variables (Variables → New → Data Layer Variable):
 |--------------|-------------------------|---------------|
 | DLV - Event Name | event_name | - |
 | DLV - Event ID | event_id | - |
+| DLV - Fallback Event ID | dlv_event_id | - |
 | DLV - Event Time | event_time | - |
 | DLV - Value | custom_data.value | 0 |
 | DLV - Currency | custom_data.currency | USD |
 | DLV - Content IDs | custom_data.content_ids | [] |
 | DLV - Custom Data | custom_data | - |
 | DLV - User Data | user_data | - |
+| DLV - WhatsApp Href | custom_data.href | - |
+| DLV - WhatsApp Label | custom_data.content_name | - |
 
 Create these Constant Variables:
 
@@ -117,6 +120,8 @@ function() {
     'view_item': 'ViewContent',
     'begin_checkout': 'InitiateCheckout',
     'whatsapp_initiate': 'Contact',
+    'whatsapp_click': 'Contact',
+    'whatsapp_lead_click': 'Contact',
     'form_submit': 'SubmitForm',
     'PageView': 'PageView'
   };
@@ -324,7 +329,7 @@ TikTok CAPI Token: <Events API token from TikTok>
 ```
 
 **GTM prerequisites (variables + triggers):**
-- Data Layer Variables: `event_name`, `event_id`, `event_time`, `custom_data`, `user_data`, `custom_data.content_ids`, `custom_data.value`, `custom_data.currency` (default USD). Optional extras if you want to display them in the tag: `custom_data.content_name`, `custom_data.content_type`, `custom_data.price`, `custom_data.description`, `custom_data.event_source_url`.
+- Data Layer Variables: `event_name`, `event_id`, `event_time`, `custom_data`, `user_data`, `custom_data.content_ids`, `custom_data.value`, `custom_data.currency` (default USD). Optional extras if you want to display them in the tag: `custom_data.content_name`, `custom_data.content_type`, `custom_data.price`, `custom_data.description`, `custom_data.href`, `custom_data.event_source_url`.
 - Custom JS Variable: TikTok event mapper that converts `view_item` → `ViewContent`, `add_to_cart` → `AddToCart`, `begin_checkout` → `InitiateCheckout`, `add_payment_info` → `AddPaymentInfo`, `purchase` → `PlaceAnOrder`, `whatsapp_initiate` → `Contact` (or rename to "WhatsAppLead" if you prefer a custom event).
 - Triggers: **All Pages - PageView** and **Ultra Pixels Custom Event** (`up_event`).
 
@@ -356,10 +361,11 @@ TikTok CAPI Token: <Events API token from TikTok>
           content_type: base.content_type || 'product',
           content_name: base.content_name,
           content_category: base.content_category,
+          href: {{DLV - WhatsApp Href}},
           price: base.price,
           description: base.description,
           url: base.event_source_url || {{Page URL}},
-          event_id: {{DLV - Event ID}}
+          event_id: {{DLV - Event ID}} || {{DLV - Fallback Event ID}} || {{DLV - WhatsApp Label}}
         }, base);
 
         // Include user data for better match (email/phone/ip/user_agent from plugin where available)
@@ -380,6 +386,19 @@ TikTok CAPI Token: <Events API token from TikTok>
 - **AddPaymentInfo** (`add_payment_info`): same as above with payment step context when provided by the theme/checkout.
 - **Purchase** (`purchase`): `value`, `currency`, `content_ids`, `content_type`, `content_name`, `event_id`, `event_time`, `url`, user info; transaction amount will populate `value`.
 - **WhatsApp Lead** (`whatsapp_initiate` or `whatsapp_click`): send as `Contact` or rename the TikTok event to `WhatsAppLead` in the mapper; payload can include `value`, `currency`, `content_name` (e.g., button label), and `url`.
+
+**WhatsApp buttons: step-by-step GTM wiring (browser pixel + plugin Events API)**
+1. **Add attributes in Elementor/HTML** to any WhatsApp CTA so the plugin pushes an `up_event` with WhatsApp context:
+   ```
+   data-up-event="whatsapp_click" 
+   data-up-payload='{"content_name":"WhatsApp CTA","content_category":"whatsapp","href":"https://wa.me/212703914377?text=Hi"}'
+   ```
+   - `content_name` becomes the TikTok `content_name`/label, `href` becomes the URL; add a `value` if you want to pass revenue attribution.
+2. **Data Layer Variables**: ensure `DLV - WhatsApp Href` (`custom_data.href`) and `DLV - WhatsApp Label` (`custom_data.content_name`) exist (see variable table above).
+3. **TikTok mapper**: keep `whatsapp_click`/`whatsapp_lead_click` mapped to `Contact` (already shown above).
+4. **Dynamic TikTok tag**: verify the Custom HTML tag includes `event_id: {{DLV - Event ID}} || {{DLV - Fallback Event ID}} || {{DLV - WhatsApp Label}}` in the payload. If your `up_event` doesn’t include `event_id`, duplicate the tag and set a `Lookup Table` variable that falls back to `dlv_event_id` or the label/href.
+5. **Trigger**: use `Ultra Pixels Custom Event` so the tag fires on the WhatsApp click event.
+6. **Test**: in GTM Preview click the WhatsApp button and confirm `up_event` shows the href/label and the TikTok tag fires once. Then check TikTok Test Events to confirm deduped Events API + browser entries share the same Event ID.
 
 **Access Token (for Events API via plugin):**
 1. Go to **TikTok Events Manager → Settings → Events API**.
