@@ -430,17 +430,31 @@ Use this mapping when configuring your Custom JS variable or Lookup Tables so GT
 - **WhatsApp Lead** (`whatsapp_initiate` or `whatsapp_click`): send as `Contact` or rename the TikTok event to `WhatsAppLead` in the mapper; payload can include `value`, `currency`, `content_name` (e.g., button label), `href`/`url`, and `event_id` or `dlv_event_id` for dedupe.
 
 **WhatsApp buttons: step-by-step GTM wiring (browser pixel + plugin Events API)**
-1. **Add attributes in Elementor/HTML** to any WhatsApp CTA so the plugin pushes an `up_event` with WhatsApp context:
+1. **Add attributes in Elementor/HTML** to every WhatsApp CTA so the plugin pushes an `up_event` with WhatsApp context (no GTM template needed):
    ```
-   data-up-event="whatsapp_click" 
+   data-up-event="whatsapp_click"
    data-up-payload='{"content_name":"WhatsApp CTA","content_category":"whatsapp","href":"https://wa.me/212703914377?text=Hi"}'
    ```
-   - `content_name` becomes the TikTok `content_name`/label, `href` becomes the URL; add a `value` if you want to pass revenue attribution.
-2. **Data Layer Variables**: ensure `DLV - WhatsApp Href` (`custom_data.href`) and `DLV - WhatsApp Label` (`custom_data.content_name`) exist (see variable table above).
-3. **TikTok mapper**: keep `whatsapp_click`/`whatsapp_lead_click` mapped to `Contact` (already shown above).
-4. **Dynamic TikTok tag**: verify the Custom HTML tag includes `event_id: {{DLV - Event ID}} || {{DLV - Fallback Event ID}} || {{DLV - WhatsApp Label}}` in the payload. If your `up_event` doesn’t include `event_id`, duplicate the tag and set a `Lookup Table` variable that falls back to `dlv_event_id` or the label/href.
-5. **Trigger**: use `Ultra Pixels Custom Event` so the tag fires on the WhatsApp click event.
-6. **Test**: in GTM Preview click the WhatsApp button and confirm `up_event` shows the href/label and the TikTok tag fires once. Then check TikTok Test Events to confirm deduped Events API + browser entries share the same Event ID.
+   - `content_name` becomes the TikTok `content_name`/label, `href` becomes the URL. Add `value` if you want to pass revenue attribution.
+2. **Data Layer Variables**: double-check GTM has `DLV - Event Name` (`event_name`), `DLV - WhatsApp Href` (`custom_data.href`), `DLV - WhatsApp Label` (`custom_data.content_name`), and `DLV - Fallback Event ID` (`dlv_event_id`). If `event_id` is missing in the payload, `dlv_event_id` keeps dedupe intact.
+3. **TikTok mapper**: keep `whatsapp_click`/`whatsapp_lead_click` mapped to `Contact` (or rename to `WhatsAppLead`), and ensure the mapper returns `PageView` only when the incoming `event_name` is truly `PageView`.
+4. **Dynamic TikTok tag**: include
+   ```
+   event_id: {{DLV - Event ID}} || {{DLV - Fallback Event ID}} || {{DLV - WhatsApp Label}}
+   ```
+   inside the payload. If the tag still shows `PageView`, add a blocking rule so the **TikTok Pixel – Dynamic Events** tag fires only when `{{DLV - Event Name}}` does **not** equal `PageView`.
+5. **Trigger**: use `Ultra Pixels Custom Event` so the tag fires on `up_event` (the WhatsApp click). The PageView trigger should be used only by the pageview tag.
+6. **Test with GTM Preview**:
+   - Click the WhatsApp button and open the event in GTM preview. The **Summary → Event Name** should read `whatsapp_click` or `whatsapp_lead_click`, not `PageView`.
+   - Under **Data Layer**, confirm `event_name`, `dlv_event_id`, and `custom_data.href` are present.
+   - Verify only the **TikTok Pixel – Dynamic Events** tag fires (not the PageView tag). If `PageView` appears instead, the HTML lacked `data-up-event`, or a cache/minifier removed the attribute—re-add it and retest.
+7. **TikTok Test Events**: perform a live click and check that the browser event uses the same Event ID the plugin sends via Events API. If the IDs differ, add `{{DLV - Fallback Event ID}}` to the payload and re-test.
+
+**WhatsApp troubleshooting checklist (when GTM shows PageView instead of WhatsApp):**
+- Confirm the rendered HTML still contains `data-up-event="whatsapp_click"` (view source or DevTools Elements). Some cache/minify plugins strip attributes; whitelist `data-up-*` if needed.
+- In GTM Preview, ensure **Event Name** equals `whatsapp_click`; if it reads `PageView`, the attributes are missing on the clicked element.
+- Make sure your **Ultra Pixels Custom Event** trigger listens for `up_event` and that your dynamic tag does **not** also use the PageView trigger.
+- Enable the `dlv_event_id` variable in the GTM debug panel to see the fallback ID the plugin provides for WhatsApp clicks.
 
 **Access Token (for Events API via plugin):**
 1. Go to **TikTok Events Manager → Settings → Events API**.
