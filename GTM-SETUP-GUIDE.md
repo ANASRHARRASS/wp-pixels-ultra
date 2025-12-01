@@ -118,6 +118,8 @@ function() {
     'purchase': 'PlaceAnOrder',
     'add_to_cart': 'AddToCart',
     'view_item': 'ViewContent',
+    'add_payment_info': 'AddPaymentInfo',
+    'view_item_list': 'BrowseCategory',
     'begin_checkout': 'InitiateCheckout',
     'whatsapp_initiate': 'Contact',
     'whatsapp_click': 'Contact',
@@ -329,9 +331,48 @@ TikTok CAPI Token: <Events API token from TikTok>
 ```
 
 **GTM prerequisites (variables + triggers):**
-- Data Layer Variables: `event_name`, `event_id`, `event_time`, `custom_data`, `user_data`, `custom_data.content_ids`, `custom_data.value`, `custom_data.currency` (default USD). Optional extras if you want to display them in the tag: `custom_data.content_name`, `custom_data.content_type`, `custom_data.price`, `custom_data.description`, `custom_data.href`, `custom_data.event_source_url`.
-- Custom JS Variable: TikTok event mapper that converts `view_item` → `ViewContent`, `add_to_cart` → `AddToCart`, `begin_checkout` → `InitiateCheckout`, `add_payment_info` → `AddPaymentInfo`, `purchase` → `PlaceAnOrder`, `whatsapp_initiate` → `Contact` (or rename to "WhatsAppLead" if you prefer a custom event).
+- Data Layer Variables: `event_name`, `event_id`, `event_time`, `custom_data`, `user_data`, `custom_data.content_ids`, `custom_data.value`, `custom_data.currency` (default USD). Optional extras if you want to display them in the tag: `custom_data.content_name`, `custom_data.content_type`, `custom_data.price`, `custom_data.description`, `custom_data.href`, `custom_data.event_source_url`, plus `dlv_event_id` for fallback deduplication.
+- Custom JS Variable: TikTok event mapper that converts `view_item` → `ViewContent`, `add_to_cart` → `AddToCart`, `begin_checkout` → `InitiateCheckout`, `add_payment_info` → `AddPaymentInfo`, `purchase` → `PlaceAnOrder`, `view_item_list` → `BrowseCategory`, `whatsapp_initiate` → `Contact`, `whatsapp_click`/`whatsapp_lead_click` → `Contact` (rename to `WhatsAppLead` if you prefer a custom event).
 - Triggers: **All Pages - PageView** and **Ultra Pixels Custom Event** (`up_event`).
+
+**Default Meta/TikTok event mapping (plugin source):**
+```json
+{
+  "purchase": {
+    "meta": {"event_name": "Purchase", "include_user_data": true},
+    "tiktok": {"event_name": "PlaceAnOrder", "include_user_data": true}
+  },
+  "add_to_cart": {
+    "meta": {"event_name": "AddToCart", "include_user_data": false},
+    "tiktok": {"event_name": "AddToCart", "include_user_data": false}
+  },
+  "view_item": {
+    "meta": {"event_name": "ViewContent", "include_user_data": false},
+    "tiktok": {"event_name": "ViewContent", "include_user_data": false}
+  },
+  "view_item_list": {
+    "meta": {"event_name": "ViewCategory", "include_user_data": false},
+    "tiktok": {"event_name": "BrowseCategory", "include_user_data": false}
+  },
+  "begin_checkout": {
+    "meta": {"event_name": "InitiateCheckout", "include_user_data": false},
+    "tiktok": {"event_name": "InitiateCheckout", "include_user_data": false}
+  },
+  "add_payment_info": {
+    "meta": {"event_name": "AddPaymentInfo", "include_user_data": true},
+    "tiktok": {"event_name": "AddPaymentInfo", "include_user_data": true}
+  },
+  "whatsapp_initiate": {
+    "meta": {"event_name": "Contact", "include_user_data": true},
+    "tiktok": {"event_name": "Contact", "include_user_data": true}
+  },
+  "whatsapp_click": {
+    "meta": {"event_name": "Contact", "include_user_data": false},
+    "tiktok": {"event_name": "Contact", "include_user_data": false}
+  }
+}
+```
+Use this mapping when configuring your Custom JS variable or Lookup Tables so GTM tags stay aligned with the plugin’s Events API payloads.
 
 **GTM Tags (Custom HTML, no TikTok template):**
 - **TikTok Pixel – PageView**
@@ -382,10 +423,11 @@ TikTok CAPI Token: <Events API token from TikTok>
 **Event mapping + payload expectations:**
 - **ViewContent** (`view_item`): `value`, `currency`, `content_ids`, `content_type`, `content_name`, `content_category`, `price`, `description`, `event_time`, `url`, plus user info (`email`, `phone`, `external_id`, `ip`, `user_agent`, `ttclid`) when present.
 - **AddToCart** (`add_to_cart`): same as above with `event_id` populated for deduplication.
+- **ViewCategory/BrowseCategory** (`view_item_list`): `content_ids`, `content_category`, `event_time`, `url`, optional user info if available from the plugin payload.
 - **InitiateCheckout** (`begin_checkout`): `value`, `currency`, `content_ids`, `content_type`, `content_name`, `event_id`, `event_time`, `url`, user info.
 - **AddPaymentInfo** (`add_payment_info`): same as above with payment step context when provided by the theme/checkout.
 - **Purchase** (`purchase`): `value`, `currency`, `content_ids`, `content_type`, `content_name`, `event_id`, `event_time`, `url`, user info; transaction amount will populate `value`.
-- **WhatsApp Lead** (`whatsapp_initiate` or `whatsapp_click`): send as `Contact` or rename the TikTok event to `WhatsAppLead` in the mapper; payload can include `value`, `currency`, `content_name` (e.g., button label), and `url`.
+- **WhatsApp Lead** (`whatsapp_initiate` or `whatsapp_click`): send as `Contact` or rename the TikTok event to `WhatsAppLead` in the mapper; payload can include `value`, `currency`, `content_name` (e.g., button label), `href`/`url`, and `event_id` or `dlv_event_id` for dedupe.
 
 **WhatsApp buttons: step-by-step GTM wiring (browser pixel + plugin Events API)**
 1. **Add attributes in Elementor/HTML** to any WhatsApp CTA so the plugin pushes an `up_event` with WhatsApp context:
